@@ -1,0 +1,388 @@
+"use client";
+
+import { useState } from "react";
+import { useAuthStore } from "@/store/auth-store";
+import { useDataStore, Customer } from "@/store/data-store";
+import { 
+  Plus, 
+  Search, 
+  Filter, 
+  MoreHorizontal, 
+  Mail, 
+  Phone, 
+  MapPin, 
+  ChevronRight,
+  X,
+  Trash2,
+  Edit2,
+  Save,
+  CheckCircle2,
+  AlertCircle
+} from "lucide-react";
+import { toast } from "sonner";
+
+export default function CRMPage() {
+  const { user } = useAuthStore();
+  const { customers, addCustomer, updateCustomer, deleteCustomer, teamMembers } = useDataStore();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  
+  const canEditPayments = user?.role === "CEO" || user?.role === "Buchhaltung";
+  
+  // Form State
+  const [formData, setFormData] = useState<Partial<Customer>>({
+    name: "",
+    email: "",
+    status: "Active",
+    color: "#3B82F6"
+  });
+
+  const filteredCustomers = customers.filter(c => 
+    c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    c.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleOpenModal = (customer?: Customer) => {
+    if (customer) {
+      setEditingCustomer(customer);
+      setFormData(customer);
+    } else {
+      setEditingCustomer(null);
+      setFormData({
+        name: "",
+        email: "",
+        status: "Active",
+        color: "#" + Math.floor(Math.random()*16777215).toString(16)
+      });
+    }
+    setIsModalOpen(true);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.email) {
+      toast.error("Bitte füllen Sie alle Pflichtfelder aus.");
+      return;
+    }
+
+    if (editingCustomer) {
+      updateCustomer(editingCustomer.id, formData);
+      toast.success("Kunde erfolgreich aktualisiert");
+    } else {
+      const newCustomer: Customer = {
+        ...formData as Customer,
+        id: "c" + Date.now(),
+      };
+      addCustomer(newCustomer);
+      toast.success("Kunde erfolgreich hinzugefügt");
+    }
+    setIsModalOpen(false);
+  };
+
+  const handleDelete = (id: string) => {
+    if (confirm("Möchten Sie diesen Kunden wirklich löschen?")) {
+      deleteCustomer(id);
+      toast.success("Kunde gelöscht");
+    }
+  };
+
+  return (
+    <div className="space-y-8 pb-20 relative">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Kunden (CRM)</h1>
+          <p className="text-sm text-gray-500 mt-2 font-medium">Verwalten Sie Ihre Kundenbeziehungen und Leads zentral.</p>
+        </div>
+        <button 
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 bg-brand-secondary text-white px-6 py-3 rounded-2xl text-sm font-bold hover:scale-105 transition-all shadow-lg shadow-brand-secondary/20"
+        >
+          <Plus className="h-5 w-5" />
+          Kunde hinzufügen
+        </button>
+      </div>
+
+      {/* Search & Filter */}
+      <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm p-4 flex flex-col md:flex-row md:items-center gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input 
+            type="text" 
+            placeholder="Suchen nach Name oder E-Mail..." 
+            className="w-full pl-10 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-black/5 outline-none transition-all"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <div className="flex items-center gap-2">
+           <button className="px-4 py-3 bg-gray-50 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 transition-all flex items-center gap-2">
+              <Filter className="h-4 w-4" /> Filter
+           </button>
+           <div className="h-10 w-px bg-gray-100 mx-2" />
+           <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">{filteredCustomers.length} Ergebnisse</p>
+        </div>
+      </div>
+
+      {/* Customer Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {filteredCustomers.map((customer) => (
+          <div key={customer.id} className="bg-white p-8 rounded-[40px] border border-gray-100 shadow-sm relative group hover:shadow-xl hover:scale-[1.02] transition-all cursor-pointer">
+            <div className="flex items-start justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-3 rounded-full" style={{ backgroundColor: customer.color }} />
+                <h3 className="text-xl font-bold text-gray-900 group-hover:text-black transition-colors">{customer.name}</h3>
+              </div>
+              <div className="flex gap-2">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleOpenModal(customer); }}
+                  className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:text-black hover:bg-gray-100 transition-all"
+                >
+                  <Edit2 className="h-4 w-4" />
+                </button>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); handleDelete(customer.id); }}
+                  className="h-10 w-10 bg-red-50 rounded-xl flex items-center justify-center text-red-300 hover:text-red-500 hover:bg-red-100 transition-all"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                  customer.status === 'Active' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'
+                }`}>
+                  <div className={`h-1.5 w-1.5 rounded-full ${customer.status === 'Active' ? 'bg-emerald-500' : 'bg-orange-500'}`} />
+                  {customer.status}
+                </span>
+              </div>
+
+              <div className="pt-6 space-y-3 border-t border-gray-50">
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <Mail className="h-4 w-4 text-gray-300" />
+                  <span className="truncate font-medium">{customer.email}</span>
+                </div>
+                <div className="flex items-center gap-3 text-sm text-gray-500">
+                  <Phone className="h-4 w-4 text-gray-300" />
+                  <span className="font-medium">{customer.phone || "Nicht hinterlegt"}</span>
+                </div>
+              </div>
+            </div>
+
+            <button 
+              onClick={() => setSelectedCustomer(customer)}
+              className="mt-8 w-full py-4 bg-gray-50 rounded-2xl text-[10px] font-bold text-gray-400 uppercase tracking-widest group-hover:bg-black group-hover:text-white transition-all"
+            >
+               Details ansehen
+            </button>
+          </div>
+        ))}
+
+        {filteredCustomers.length === 0 && (
+          <div className="col-span-full py-20 text-center space-y-4">
+             <div className="h-20 w-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto">
+                <AlertCircle className="h-10 w-10 text-gray-300" />
+             </div>
+             <p className="text-gray-500 font-medium">Keine Kunden gefunden.</p>
+          </div>
+        )}
+      </div>
+
+      {/* Add/Edit Modal */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+             <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+                <h2 className="text-2xl font-bold text-gray-900">{editingCustomer ? "Kunde bearbeiten" : "Neuer Kunde"}</h2>
+                <button onClick={() => setIsModalOpen(false)} className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:text-black transition-all">
+                   <X className="h-5 w-5" />
+                </button>
+             </div>
+             <form onSubmit={handleSubmit} className="p-8 space-y-6">
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kundenname *</label>
+                   <input 
+                    type="text" 
+                    required
+                    className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                    value={formData.name}
+                    onChange={(e) => setFormData({...formData, name: e.target.value})}
+                   />
+                </div>
+                <div className="space-y-2">
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">E-Mail Adresse *</label>
+                   <input 
+                    type="email" 
+                    required
+                    className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                    value={formData.email}
+                    onChange={(e) => setFormData({...formData, email: e.target.value})}
+                   />
+                </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Telefonnummer</label>
+                    <input 
+                     type="text" 
+                     className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-black/5 outline-none"
+                     placeholder="+49 000 0000000"
+                     value={formData.phone || ""}
+                     onChange={(e) => setFormData({...formData, phone: e.target.value})}
+                    />
+                 </div>
+
+                 <div className="pt-4 space-y-4 border-t border-gray-100">
+                    <label className="text-[10px] font-bold text-black uppercase tracking-widest">Social Media Plan</label>
+                    <div className="grid grid-cols-2 gap-4">
+                       <div className="space-y-2">
+                          <label className="text-[9px] font-bold text-gray-400 uppercase">Monatlicher Preis (€)</label>
+                          <input 
+                            type="number" 
+                            className="w-full px-4 py-2 bg-gray-50 rounded-lg text-sm outline-none"
+                            value={formData.socialPlan?.price || ""}
+                            onChange={(e) => setFormData({
+                              ...formData, 
+                              socialPlan: { ...formData.socialPlan!, price: Number(e.target.value) }
+                            })}
+                          />
+                       </div>
+                       <div className="space-y-2">
+                          <label className="text-[9px] font-bold text-gray-400 uppercase">Wöchentliche Posts</label>
+                          <input 
+                            type="number" 
+                            className="w-full px-4 py-2 bg-gray-50 rounded-lg text-sm outline-none"
+                            value={formData.socialPlan?.weeklyPosts || ""}
+                            onChange={(e) => setFormData({
+                              ...formData, 
+                              socialPlan: { ...formData.socialPlan!, weeklyPosts: Number(e.target.value) }
+                            })}
+                          />
+                       </div>
+                    </div>
+                 </div>
+
+                 <div className="pt-4 flex gap-4">
+                    <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 py-4 bg-gray-50 rounded-2xl text-xs font-bold text-gray-500 hover:bg-gray-100 transition-all">
+                       Abbrechen
+                    </button>
+                    <button type="submit" className="flex-1 py-4 bg-brand-secondary text-white rounded-2xl text-xs font-bold hover:scale-[1.02] shadow-lg shadow-brand-secondary/20 transition-all flex items-center justify-center gap-2">
+                       <Save className="h-4 w-4" />
+                       {editingCustomer ? "Speichern" : "Erstellen"}
+                    </button>
+                 </div>
+             </form>
+          </div>
+        </div>
+      )}
+      {/* Detail Modal */}
+      {selectedCustomer && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[110] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] flex flex-col">
+            <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-white sticky top-0 z-10">
+               <div className="flex items-center gap-4">
+                  <div className="h-4 w-4 rounded-full" style={{ backgroundColor: selectedCustomer.color }} />
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">{selectedCustomer.name}</h2>
+                    <p className="text-xs text-gray-400 font-bold uppercase tracking-widest">Kunden-Details & Zahlungsstatus</p>
+                  </div>
+               </div>
+               <button onClick={() => setSelectedCustomer(null)} className="h-12 w-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 hover:text-black transition-all">
+                  <X className="h-6 w-6" />
+               </button>
+            </div>
+            
+            <div className="p-8 overflow-y-auto space-y-10">
+               {/* Plan Info */}
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="bg-gray-50 p-6 rounded-3xl space-y-1">
+                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Monatlicher Plan</p>
+                     <p className="text-2xl font-bold">{selectedCustomer.socialPlan?.price || 0}€</p>
+                  </div>
+                  <div className="bg-gray-50 p-6 rounded-3xl space-y-1">
+                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Posts / Woche</p>
+                     <p className="text-2xl font-bold">{selectedCustomer.socialPlan?.weeklyPosts || 0}</p>
+                  </div>
+                  <div className="bg-gray-50 p-6 rounded-3xl space-y-1">
+                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Verantwortlicher Mitarbeiter</p>
+                     <p className="text-lg font-bold">
+                        {teamMembers.find(m => m.id === selectedCustomer.assignedEmployeeId)?.fullName || "Nicht zugewiesen"}
+                     </p>
+                  </div>
+               </div>
+
+               {/* 12 Month Payment View */}
+               <div className="space-y-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold uppercase tracking-widest">Zahlungsübersicht (12 Monate)</h3>
+                    {!canEditPayments && (
+                       <span className="text-[10px] bg-red-50 text-red-500 px-3 py-1 rounded-full font-bold uppercase">Nur Lesezugriff</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 md:grid-cols-6 gap-3">
+                     {Array.from({ length: 12 }).map((_, i) => {
+                       const monthNames = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
+                       const monthKey = `2024-${String(i + 1).padStart(2, '0')}`;
+                       const payment = selectedCustomer.payments?.find(p => p.month === monthKey);
+                       const status = payment?.status || (i < 4 ? "UNPAID" : "FUTURE");
+
+                       const getStatusStyles = (s: string) => {
+                         switch(s) {
+                           case "PAID": return "bg-emerald-500 text-white border-emerald-500";
+                           case "UNPAID": return "bg-red-500 text-white border-red-500";
+                           case "PENDING": return "bg-orange-400 text-white border-orange-400";
+                           default: return "bg-gray-50 text-gray-300 border-gray-100";
+                         }
+                       };
+
+                       return (
+                         <button 
+                           key={i}
+                           disabled={!canEditPayments}
+                           onClick={() => {
+                             const currentPayments = selectedCustomer.payments || [];
+                             const nextStatus = status === "PAID" ? "UNPAID" : status === "UNPAID" ? "PENDING" : "PAID";
+                             const newPayments = currentPayments.filter(p => p.month !== monthKey);
+                             newPayments.push({ month: monthKey, status: nextStatus as any });
+                             updateCustomer(selectedCustomer.id, { payments: newPayments });
+                             setSelectedCustomer({ ...selectedCustomer, payments: newPayments });
+                             toast.success(`${monthNames[i]} Status aktualisiert`);
+                           }}
+                           className={`h-20 rounded-2xl border-2 flex flex-col items-center justify-center gap-1 transition-all ${getStatusStyles(status)} ${canEditPayments ? 'hover:scale-105 active:scale-95' : 'cursor-default'}`}
+                         >
+                           <span className="text-[10px] font-bold uppercase">{monthNames[i]}</span>
+                           <div className={`h-1.5 w-1.5 rounded-full ${status === 'FUTURE' ? 'bg-gray-200' : 'bg-white'}`} />
+                         </button>
+                       );
+                     })}
+                  </div>
+                  <div className="flex gap-4 text-[9px] font-bold uppercase text-gray-400">
+                    <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-emerald-500" /> Bezahlt</div>
+                    <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-red-500" /> Offen</div>
+                    <div className="flex items-center gap-1.5"><div className="h-2 w-2 rounded-full bg-orange-400" /> In Klärung</div>
+                  </div>
+               </div>
+            </div>
+            
+            <div className="p-8 bg-gray-50/50 flex gap-4">
+               <button 
+                 onClick={() => { setEditingCustomer(selectedCustomer); setFormData(selectedCustomer); setIsModalOpen(true); setSelectedCustomer(null); }}
+                 className="flex-1 py-4 bg-white border border-gray-200 rounded-2xl text-xs font-bold text-gray-600 hover:bg-gray-50 transition-all flex items-center justify-center gap-2"
+               >
+                 <Edit2 className="h-4 w-4" /> Bearbeiten
+               </button>
+               <button 
+                 onClick={() => setSelectedCustomer(null)}
+                 className="flex-1 py-4 bg-black text-white rounded-2xl text-xs font-bold hover:bg-gray-800 transition-all"
+               >
+                 Schließen
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
