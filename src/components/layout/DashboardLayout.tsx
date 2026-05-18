@@ -103,11 +103,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Sidebar Content */}
       <div className={`fixed inset-y-0 left-0 z-[200] w-72 bg-white transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:hidden shadow-2xl pt-[env(safe-area-inset-top)]`}>
-        <div className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-6 lg:hidden">
-          <button onClick={() => setIsSidebarOpen(false)} className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
-            <X className="h-5 w-5" />
-          </button>
-        </div>
         <Sidebar />
       </div>
 
