@@ -27,7 +27,6 @@ export default function LoginPage() {
     try {
       const demoUsers = [
         { email: "trada", pass: "trada123", role: "SUPERADMIN", name: "Trada Admin" },
-
         { email: "nisa", pass: "Nisa123", role: "Mitarbeiter", name: "Nisa" },
         { email: "arda", pass: "Arda123", role: "Mitarbeiter", name: "Arda Turan" },
         { email: "emre", pass: "Emre123", role: "Co Founder", name: "Emre Kuvvet" },
@@ -106,78 +105,103 @@ export default function LoginPage() {
       toast.success("Willkommen zurück!");
       router.push("/dashboard");
     } catch (error: any) {
-      toast.error("Login fehlgeschlagen: " + error.message);
+      toast.error("Login failed: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#F8FAFC] px-4 py-12 animate-in fade-in duration-1000">
+    <div className="min-h-screen relative flex flex-col items-center justify-center bg-[#FAFAFA] px-4 py-8 overflow-hidden animate-in fade-in duration-700">
       
-      {/* Dynamic Agency Logo */}
-      <div className="mb-10 flex flex-col items-center">
-        {invoiceSettings.systemLogo && (
-          <img src={invoiceSettings.systemLogo} alt="Logo" className="h-20 w-auto mb-4" />
-        )}
+      {/* Subtle ambient background glows for premium look */}
+      <div className="absolute top-1/4 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[350px] h-[350px] rounded-full bg-violet-100/40 blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-1/4 right-1/4 translate-x-1/2 translate-y-1/2 w-[350px] h-[350px] rounded-full bg-amber-100/30 blur-[120px] pointer-events-none" />
 
-
-      </div>
-
-      {/* Login Card */}
-      <div className="w-full max-w-[440px] bg-white rounded-[40px] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.05)] p-12 border border-gray-100">
-        <form onSubmit={handleLogin} className="space-y-8">
-          <div className="space-y-6">
-            <div className="relative group">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1 mb-2 block">
-                Benutzername
-              </label>
-              <div className="relative">
-                <User className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300 group-focus-within:text-black transition-colors" />
-                <input
-                  type="text"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-14 pr-6 py-5 rounded-2xl border border-gray-100 focus:border-black focus:ring-0 transition-all text-sm font-bold outline-none bg-gray-50/50"
-                  placeholder="Kullanıcı Adı"
-                  required
-                />
-              </div>
+      {/* Main Container */}
+      <div className="w-full max-w-[400px] flex flex-col items-center relative z-10">
+        
+        {/* Dynamic Agency Logo (Ensuring no stretching/squashing) */}
+        <div className="mb-8 flex flex-col items-center justify-center">
+          {invoiceSettings.systemLogo ? (
+            <div className="h-16 flex items-center justify-center">
+              <img 
+                src={invoiceSettings.systemLogo} 
+                alt="Logo" 
+                className="max-h-14 max-w-[220px] w-auto h-auto object-contain transition-all" 
+              />
             </div>
-
-            <div className="relative group">
-              <div className="flex justify-between items-center ml-1 mb-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  Passwort
-                </label>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-300 group-focus-within:text-black transition-colors" />
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-14 pr-6 py-5 rounded-2xl border border-gray-100 focus:border-black focus:ring-0 transition-all text-sm font-bold outline-none bg-gray-50/50"
-                  placeholder="••••••••"
-                  required
-                />
-              </div>
+          ) : (
+            <div className="h-14 w-14 rounded-2xl bg-black flex items-center justify-center shadow-lg">
+              <span className="text-white text-lg font-black tracking-tighter">T</span>
             </div>
+          )}
+        </div>
+
+        {/* Minimal Login Card */}
+        <div className="w-full bg-white rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.03)] border border-gray-100/60 p-8 sm:p-10">
+          <div className="text-center mb-8">
+            <h1 className="text-lg font-bold text-gray-900 tracking-tight">Trada Space</h1>
+            <p className="text-[11px] font-medium text-gray-400 mt-1 uppercase tracking-wider">Social OS Portal</p>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-secondary text-white rounded-2xl py-5 text-sm font-bold flex items-center justify-center gap-2 hover:scale-[1.02] transition-all disabled:opacity-50 shadow-xl shadow-brand-secondary/20 active:scale-[0.98]"
-          >
-            {loading ? "Giriş yapılıyor..." : "Anmelden"}
-            {!loading && <ArrowRight className="h-4 w-4" />}
-          </button>
-        </form>
+          <form onSubmit={handleLogin} className="space-y-6">
+            <div className="space-y-4">
+              {/* Username Input */}
+              <div className="space-y-1.5 group">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1 block">
+                  Benutzername
+                </label>
+                <div className="relative">
+                  <User className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-300 group-focus-within:text-black transition-colors" />
+                  <input
+                    type="text"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full pl-11 pr-5 py-4 rounded-2xl border border-gray-100 focus:border-black focus:ring-0 transition-all text-xs font-bold outline-none bg-gray-50/50"
+                    placeholder="Benutzername eingeben"
+                    required
+                  />
+                </div>
+              </div>
 
-        <div className="mt-12 pt-8 border-t border-gray-50 text-center">
-            © 2024 Operating System
+              {/* Password Input */}
+              <div className="space-y-1.5 group">
+                <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest ml-1 block">
+                  Passwort
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 h-4.5 w-4.5 text-gray-300 group-focus-within:text-black transition-colors" />
+                  <input
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="w-full pl-11 pr-5 py-4 rounded-2xl border border-gray-100 focus:border-black focus:ring-0 transition-all text-xs font-bold outline-none bg-gray-50/50"
+                    placeholder="••••••••"
+                    required
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full bg-black hover:bg-neutral-900 text-white rounded-2xl py-4.5 text-xs font-bold flex items-center justify-center gap-2 hover:scale-[1.01] active:scale-[0.99] transition-all duration-300 disabled:opacity-50 shadow-md shadow-black/5"
+            >
+              {loading ? "Verbindung wird hergestellt..." : "Giriş yap"}
+              {!loading && <ArrowRight className="h-3.5 w-3.5" />}
+            </button>
+          </form>
+
+          {/* Minimalist Powered By Footer */}
+          <div className="mt-8 pt-5 border-t border-gray-50 flex items-center justify-center gap-1.5 text-[9px] font-medium text-gray-400">
+            <span>powered by</span>
+            <span className="font-black text-black tracking-wider lowercase">rostr</span>
+          </div>
         </div>
+
       </div>
     </div>
   );
