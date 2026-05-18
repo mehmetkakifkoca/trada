@@ -129,12 +129,12 @@ export default function OffersPage() {
       {/* Add Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-             <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Neues Angebot</h2>
+          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
+             <div className="p-6 sm:p-8 border-b border-gray-50 flex items-center justify-between">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Neues Angebot</h2>
                 <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black"><X className="h-6 w-6" /></button>
              </div>
-             <form onSubmit={handleCreateOffer} className="p-8 space-y-6">
+             <form onSubmit={handleCreateOffer} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-2">
                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kunde *</label>
                    <select required className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm appearance-none outline-none">
