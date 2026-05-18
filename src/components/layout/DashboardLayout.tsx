@@ -1,22 +1,31 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Sidebar } from "./Sidebar";
 import { Topbar } from "./Topbar";
 import { useAuthStore } from "@/store/auth-store";
 import { useRouter, usePathname } from "next/navigation";
-import { Menu, X } from "lucide-react";
-
+import { Menu, X, Bell, LogOut, Home, UserCircle, Check, Info } from "lucide-react";
 import { useDataStore } from "@/store/data-store";
+import Link from "next/link";
+import { auth } from "@/lib/firebase";
 
 export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuthStore();
-  const { invoiceSettings } = useDataStore();
+  const { invoiceSettings, notifications, markNotificationAsRead } = useDataStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showMobileNotifications, setShowMobileNotifications] = useState(false);
   const pathname = usePathname();
 
-  const isSuperAdmin = user?.role?.toLowerCase() === "superadmin";
-  const isCEO = isSuperAdmin || ["ceo", "co founder", "admin", "administrator"].includes(user?.role?.toLowerCase() || "");
+  const unreadCount = notifications.filter(n => !n.read).length;
+  const isDashboard = pathname === "/dashboard";
+
+  const handleLogout = async () => {
+    document.cookie = "__session=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    localStorage.removeItem("auth-storage");
+    await auth.signOut();
+    window.location.href = "/login";
+  };
 
   // Automatic Daily Google Drive Backup for CEO/Admin with configurable time schedule
   useEffect(() => {
@@ -98,23 +107,121 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="flex h-20 items-center justify-between border-b border-gray-100 bg-white px-4 sm:px-6 lg:hidden">
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="h-12 w-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-900 shadow-sm"
-          >
-            <Menu className="h-6 w-6" />
-          </button>
+        {/* Premium Single-Row Mobile Header */}
+        <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-4 lg:hidden relative z-[100] shadow-sm">
           <div className="flex items-center gap-3">
-             <div className="h-10 w-10 rounded-xl bg-black flex items-center justify-center">
-               <span className="text-white text-xs font-black">T</span>
-             </div>
-             <span className="text-sm font-black text-gray-900 tracking-tight">Trada Media</span>
+            {/* Sidebar Toggle */}
+            <button 
+              onClick={() => setIsSidebarOpen(true)}
+              className="h-10 w-10 bg-gray-50 hover:bg-gray-100 rounded-xl flex items-center justify-center text-gray-900 transition-colors"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            
+            {/* Logo */}
+            <div className="flex items-center gap-2">
+               <div className="h-8 w-8 rounded-lg bg-black flex items-center justify-center">
+                 <span className="text-white text-[10px] font-black">T</span>
+               </div>
+               <span className="text-xs font-black text-gray-900 tracking-tight">Trada</span>
+            </div>
           </div>
-          <div className="w-12" /> {/* Spacer for centering */}
+
+          <div className="flex items-center gap-2">
+            {/* Quick Home */}
+            {!isDashboard && (
+              <Link 
+                href="/dashboard"
+                className="p-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-gray-400 hover:text-black transition-all"
+              >
+                <Home className="h-4.5 w-4.5" />
+              </Link>
+            )}
+
+            {/* Notifications */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowMobileNotifications(!showMobileNotifications)}
+                className="relative p-2 text-gray-400 hover:text-black transition-colors"
+              >
+                <Bell className="h-4.5 w-4.5" />
+                {unreadCount > 0 && (
+                  <span className="absolute top-1 right-1 h-3.5 w-3.5 bg-red-500 text-white text-[8px] font-bold rounded-full flex items-center justify-center border border-white">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+
+              {showMobileNotifications && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowMobileNotifications(false)} />
+                  <div className="absolute right-0 mt-3 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                    <div className="p-4 border-b border-gray-50 flex items-center justify-between">
+                      <h3 className="text-xs font-bold text-gray-900">Benachrichtigungen</h3>
+                      <button onClick={() => setShowMobileNotifications(false)}>
+                        <X className="h-3.5 w-3.5 text-gray-400" />
+                      </button>
+                    </div>
+                    <div className="max-h-[300px] overflow-y-auto">
+                      {notifications.map((n) => (
+                        <div 
+                          key={n.id} 
+                          onClick={() => { markNotificationAsRead(n.id); }}
+                          className={`p-4 hover:bg-gray-50 transition-colors cursor-pointer border-b border-gray-50 last:border-0 ${!n.read ? 'bg-blue-50/30' : ''}`}
+                        >
+                          <div className="flex gap-3">
+                            <div className={`h-6.5 w-6.5 rounded-full flex items-center justify-center shrink-0 ${
+                              n.type === 'success' ? 'bg-emerald-50 text-emerald-500' : 
+                              n.type === 'warning' ? 'bg-orange-50 text-orange-500' : 
+                              'bg-blue-50 text-blue-500'
+                            }`}>
+                              {n.type === 'success' ? <Check className="h-3 w-3" /> : <Info className="h-3 w-3" />}
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-bold text-gray-900">{n.title}</p>
+                              <p className="text-[9px] text-gray-500 mt-0.5 leading-normal">{n.message}</p>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                      {notifications.length === 0 && (
+                        <div className="p-6 text-center text-gray-400 text-[10px]">Keine Benachrichtigungen</div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Profile Avatar / Settings Link */}
+            <Link 
+              href="/settings"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-xs font-bold text-white shadow-sm overflow-hidden shrink-0 border border-gray-100"
+              style={{ backgroundColor: user?.colorTag || '#1f2937' }}
+            >
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
+              ) : (
+                <UserCircle className="h-5 w-5 text-white/50" />
+              )}
+            </Link>
+            
+            {/* Logout */}
+            <button 
+              onClick={handleLogout}
+              className="p-2 bg-red-50 hover:bg-red-100 text-red-400 hover:text-red-600 rounded-xl transition-all"
+              title="Logout"
+            >
+              <LogOut className="h-4.5 w-4.5" />
+            </button>
+          </div>
         </header>
 
-        <Topbar />
+        {/* Desktop Topbar - Hidden on mobile */}
+        <div className="hidden lg:block">
+          <Topbar />
+        </div>
+
         <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 sm:p-6 lg:p-8">
           {children}
         </main>
@@ -122,4 +229,3 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
