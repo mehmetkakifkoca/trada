@@ -81,8 +81,8 @@ export function Sidebar() {
   return (
     <div className="flex h-full w-64 flex-col border-r border-gray-100 bg-white">
       <div className="flex h-20 flex-col justify-center px-6">
-        {invoiceSettings.systemLogo ? (
-          <img src={invoiceSettings.systemLogo} alt="Logo" className="h-10 w-auto object-contain" />
+        {invoiceSettings.systemLogo || "/logo.png" ? (
+          <img src={invoiceSettings.systemLogo || "/logo.png"} alt="Logo" className="h-10 w-auto object-contain" />
         ) : (
           <h1 className="text-xl font-bold text-gray-900 leading-none">Dashboard</h1>
         )}

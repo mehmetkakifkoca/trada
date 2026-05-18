@@ -533,8 +533,8 @@ export default function DashboardPage() {
           <p className="text-sm font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">{currentTime.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })} • {currentTime.toLocaleDateString('de-DE', { weekday: 'long' })}</p>
         </div>
       </div>
-      {invoiceSettings.systemLogo && (
-        <img src={invoiceSettings.systemLogo} alt="" className="h-10 w-auto opacity-30 hidden lg:block" />
+      {(invoiceSettings.systemLogo || "/logo.png") && (
+        <img src={invoiceSettings.systemLogo || "/logo.png"} alt="" className="h-10 w-auto opacity-30 hidden lg:block" />
       )}
     </div>
   );

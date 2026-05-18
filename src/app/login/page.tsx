@@ -123,10 +123,10 @@ export default function LoginPage() {
         
         {/* Dynamic Agency Logo (Ensuring no stretching/squashing) */}
         <div className="mb-8 flex flex-col items-center justify-center">
-          {invoiceSettings.systemLogo ? (
+          {invoiceSettings.systemLogo || "/logo.png" ? (
             <div className="h-16 flex items-center justify-center">
               <img 
-                src={invoiceSettings.systemLogo} 
+                src={invoiceSettings.systemLogo || "/logo.png"} 
                 alt="Logo" 
                 className="max-h-14 max-w-[220px] w-auto h-auto object-contain transition-all" 
               />
