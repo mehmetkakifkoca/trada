@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useDataStore } from "@/store/data-store";
 import { useAuthStore } from "@/store/auth-store";
+import { toast } from "sonner";
 
 export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuthStore();
@@ -27,6 +28,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
           if (cloudData) {
             console.log("[Cloud Sync] Cloud database found! Hydrating local store...");
             useDataStore.setState(cloudData);
+            toast.success("Daten wurden aus der Cloud geladen!");
           } else {
             console.log("[Cloud Sync] No cloud database found. Initializing with local data...");
             // Initialize server with local storage data if empty
@@ -41,18 +43,29 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
                   return acc;
                 }, {});
 
-                await fetch("/api/sync", {
+                const initResponse = await fetch("/api/sync", {
                   method: "POST",
                   headers: { "Content-Type": "application/json" },
                   body: JSON.stringify(stateToSave),
                 });
-                console.log("[Cloud Sync] Initialized Cloud database with current local data!");
+                
+                if (initResponse.ok) {
+                  console.log("[Cloud Sync] Initialized Cloud database with current local data!");
+                  toast.info("Bulut veritabanı yerel verilerinizle ilk kez oluşturuldu!");
+                } else {
+                  const errData = await initResponse.json().catch(() => ({}));
+                  toast.error("Bulut başlatma hatası: " + (errData.error || initResponse.statusText));
+                }
               }
             }
           }
+        } else {
+          const errData = await response.json().catch(() => ({}));
+          toast.error("Bulut verisi yüklenemedi: " + (errData.error || response.statusText));
         }
       } catch (err: any) {
         console.error("[Cloud Sync] Error loading cloud data:", err);
+        toast.error("Bulut bağlantı hatası: " + err.message);
       } finally {
         setIsSyncing(false);
         // Delay setting initial load to false slightly to allow Zustand state updates to settle
@@ -101,11 +114,14 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
 
           if (response.ok) {
             console.log("[Cloud Sync] Successfully synced changes to the Server Cloud Database!");
+            toast.success("Änderungen mit Cloud synchronisiert!", { duration: 1500 });
           } else {
-            console.error("[Cloud Sync] Server responded with error during sync.");
+            const errData = await response.json().catch(() => ({}));
+            toast.error("Auto-Save Bulut Hatası: " + (errData.error || response.statusText));
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("[Cloud Sync] Auto-save failed:", err);
+          toast.error("Auto-Save Bulut Bağlantı Hatası: " + err.message);
         }
       }, 3000); // 3 seconds debounce
     });
