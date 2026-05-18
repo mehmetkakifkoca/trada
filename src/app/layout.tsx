@@ -22,6 +22,11 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Trada Space",
   },
+  icons: {
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
+  },
 };
 
 export const viewport = {
