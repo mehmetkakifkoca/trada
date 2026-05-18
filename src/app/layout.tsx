@@ -4,6 +4,7 @@ import "./globals.css";
 import { AuthProvider } from "@/components/providers/AuthProvider";
 import { QueryProvider } from "@/components/providers/QueryProvider";
 import { BrandThemeProvider } from "@/components/providers/BrandThemeProvider";
+import { CloudSyncProvider } from "@/components/providers/CloudSyncProvider";
 import { Toaster } from "sonner";
 
 const poppins = Poppins({
@@ -36,9 +37,11 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <QueryProvider>
           <AuthProvider>
-            <BrandThemeProvider>
-              {children}
-            </BrandThemeProvider>
+            <CloudSyncProvider>
+              <BrandThemeProvider>
+                {children}
+              </BrandThemeProvider>
+            </CloudSyncProvider>
           </AuthProvider>
           <Toaster position="top-right" richColors />
         </QueryProvider>
