@@ -32,9 +32,9 @@ export default function RootLayout({
   return (
     <html
       lang="de"
-      className={`${poppins.variable} h-full antialiased`}
+      className={`${poppins.variable} h-full antialiased max-w-full overflow-x-hidden`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
+      <body className="min-h-full flex flex-col bg-background text-foreground font-sans max-w-full overflow-x-hidden">
         <QueryProvider>
           <AuthProvider>
             <CloudSyncProvider>
