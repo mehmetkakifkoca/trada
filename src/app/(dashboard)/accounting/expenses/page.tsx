@@ -269,7 +269,7 @@ export default function ExpensesPage() {
           {filteredExpenses.map((exp) => {
             const cat = categories.find(c => c.name === exp.category) || categories[5];
             return (
-              <div key={exp.id} className="p-6 flex items-center justify-between hover:bg-gray-50/50 transition-colors group">
+              <div key={exp.id} className="p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 hover:bg-gray-50/50 transition-colors group">
                 <div className="flex items-center gap-4 min-w-0">
                   <div className={`h-12 w-12 rounded-2xl flex items-center justify-center shrink-0 ${cat.color}`}>
                     <cat.icon className="h-6 w-6" />
@@ -325,13 +325,13 @@ export default function ExpensesPage() {
 
       {/* Create Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 my-10">
-             <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-                <h2 className="text-2xl font-bold text-gray-900">Ausgabe erfassen</h2>
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
+             <div className="p-6 sm:p-8 border-b border-gray-50 flex items-center justify-between">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Ausgabe erfassen</h2>
                 <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-black transition-all"><X className="h-6 w-6" /></button>
              </div>
-             <form onSubmit={handleSubmit} className="p-8 space-y-6">
+             <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
                 <div className="space-y-2">
                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Zweck / Titel *</label>
                    <input 
@@ -342,7 +342,7 @@ export default function ExpensesPage() {
                    />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kategorie</label>
                      <select 
@@ -364,7 +364,7 @@ export default function ExpensesPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Projekt (Optional)</label>
                      <select 
@@ -476,7 +476,7 @@ export default function ExpensesPage() {
       {previewExpense && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-3xl rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className="p-8 border-b border-gray-50 flex items-center justify-between shrink-0">
+            <div className="p-4 sm:p-8 border-b border-gray-50 flex items-start sm:items-center justify-between shrink-0 gap-4">
               <div>
                 <h2 className="text-xl font-bold text-gray-900 truncate max-w-md">{previewExpense.title}</h2>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">
@@ -507,7 +507,7 @@ export default function ExpensesPage() {
               </button>
             </div>
             
-            <div className="flex-1 overflow-y-auto p-8 bg-gray-50 flex items-center justify-center">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 bg-gray-50 flex items-center justify-center">
               {previewExpense.fileType?.includes("pdf") ? (
                 <iframe 
                   src={previewExpense.fileUrl} 

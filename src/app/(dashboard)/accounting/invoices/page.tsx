@@ -227,7 +227,7 @@ export default function InvoicesDashboard() {
       </div>
 
       {/* Navigation Tabs */}
-      <div className="flex items-center gap-6 border-b border-gray-100 px-2">
+      <div className="flex items-center gap-6 border-b border-gray-100 px-2 overflow-x-auto whitespace-nowrap hide-scrollbar">
         <button 
           onClick={() => setViewMode("ALL")}
           className={`pb-4 text-sm font-bold transition-all border-b-2 ${viewMode === "ALL" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}
@@ -290,8 +290,8 @@ export default function InvoicesDashboard() {
             </div>
           </div>
 
-          <div className="">
-            <table className="w-full text-left">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left min-w-[800px]">
               <thead>
                 <tr className="bg-gray-50/50">
                   <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-pointer hover:text-black transition-colors" onClick={() => handleSort('id')}>
@@ -483,14 +483,14 @@ export default function InvoicesDashboard() {
 
       {isPartialModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Teilrechnung erstellen</h2>
+          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="p-6 sm:p-8 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Teilrechnung erstellen</h2>
               <button onClick={() => setIsPartialModalOpen(false)} className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 hover:text-black">
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="p-8 space-y-6">
+            <div className="p-6 sm:p-8 space-y-6">
               <div className="flex gap-2 p-1 bg-gray-50 rounded-2xl">
                 <button 
                   onClick={() => setPartialInvoiceData(p => ({ ...p, mode: 'PERCENTAGE' }))}

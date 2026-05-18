@@ -281,7 +281,7 @@ export default function InvoiceEditorPage() {
       </div>
 
       {/* Internal Tabs */}
-      <div className="flex items-center gap-8 border-b border-gray-100 px-4">
+      <div className="flex items-center gap-8 border-b border-gray-100 px-4 overflow-x-auto whitespace-nowrap hide-scrollbar">
         <button onClick={() => setActiveTab("data")} className={`pb-4 text-xs font-bold transition-all border-b-2 ${activeTab === "data" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Rechnungsdaten</button>
         {!isNew && (
           <>
@@ -298,11 +298,11 @@ export default function InvoiceEditorPage() {
             
             {/* Section: Items Table */}
             <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
-              <div className="p-8 border-b border-gray-50 flex items-center justify-between">
+              <div className="p-4 sm:p-8 border-b border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                   <Package className="h-5 w-5 text-gray-400" /> Positionen
                 </h2>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                    <button onClick={() => setIsProductModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded-lg hover:bg-gray-800 transition-all uppercase tracking-wider">
                       <Search className="h-3 w-3" /> Produkt-Datenbank
                    </button>
@@ -427,15 +427,15 @@ export default function InvoiceEditorPage() {
                 </DragDropContext>
               </div>
 
-              <div className="p-8 border-t border-gray-50 flex items-center justify-between">
+              <div className="p-4 sm:p-8 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                  <button 
                   onClick={() => handleAddPosition('item')}
-                  className="flex items-center gap-2 text-sm font-bold text-black hover:opacity-70 transition-all"
+                  className="flex items-center gap-2 text-sm font-bold text-black hover:opacity-70 transition-all self-start sm:self-auto"
                  >
                    <Plus className="h-5 w-5" /> Position hinzufügen
                  </button>
                  
-                 <div className="flex items-center gap-4">
+                 <div className="flex items-center gap-4 self-end sm:self-auto">
                     <div className="text-right">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Zwischensumme (Netto)</p>
                       <p className="text-xl font-bold text-gray-900">{formatCurrency(invoice.amountNet || 0)}</p>
@@ -646,9 +646,9 @@ export default function InvoiceEditorPage() {
       {/* New Customer Modal */}
       {isCustomerModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-              <h2 className="text-2xl font-bold text-gray-900">Kunden hinzufügen</h2>
+          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
+            <div className="p-6 sm:p-8 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Kunden hinzufügen</h2>
               <button onClick={() => setIsCustomerModalOpen(false)} className="text-gray-400 hover:text-black"><X className="h-6 w-6" /></button>
             </div>
             <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
@@ -666,7 +666,7 @@ export default function InvoiceEditorPage() {
               setInvoice({ ...invoice, customerId: newC.id, customerName: newC.name, email: newC.email });
               setIsCustomerModalOpen(false);
               toast.success("Customer added and selected");
-            }} className="p-8 space-y-6">
+            }} className="p-6 sm:p-8 space-y-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Firmenname *</label>
                 <input name="name" required className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm outline-none" placeholder="e.g. Future Tech Ltd." />
