@@ -38,6 +38,7 @@ export default function LoginPage() {
 
       const { teamMembers } = useDataStore.getState();
       const inputUsername = email.trim().toLowerCase();
+      const inputPassword = password.trim();
       
       // 1. Try to find in team database (Primary)
       const teamMember = teamMembers.find(m => 
@@ -47,9 +48,9 @@ export default function LoginPage() {
       );
 
       // 2. Legacy demo users fallback
-      const matchedDemo = demoUsers.find(u => u.email.toLowerCase() === inputUsername && u.pass === password);
+      const matchedDemo = demoUsers.find(u => u.email.toLowerCase() === inputUsername && u.pass === inputPassword);
 
-      if (teamMember && (teamMember.password === password || password === "admin123" || !!matchedDemo)) {
+      if (teamMember && (teamMember.password === inputPassword || inputPassword === "admin123" || !!matchedDemo)) {
         document.cookie = "__session=demo-token; path=/; max-age=3600";
         setUser({
           id: teamMember.id === "e7" ? "demo-admin" : `demo-${teamMember.id}`,
@@ -85,7 +86,7 @@ export default function LoginPage() {
       }
 
       // Real Firebase Auth fallback
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email.trim(), inputPassword);
       
       const dbMember = teamMembers.find(m => 
         m.username.toLowerCase() === email.toLowerCase() || 
