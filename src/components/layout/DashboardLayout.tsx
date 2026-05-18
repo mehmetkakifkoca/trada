@@ -97,8 +97,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       )}
 
       {/* Mobile Sidebar Content */}
-      <div className={`fixed inset-y-0 left-0 z-[200] w-72 bg-white transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:hidden shadow-2xl`}>
-        <div className="absolute top-6 right-6 lg:hidden">
+      <div className={`fixed inset-y-0 left-0 z-[200] w-72 bg-white transform ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} transition-transform duration-300 ease-in-out lg:hidden shadow-2xl pt-[env(safe-area-inset-top)]`}>
+        <div className="absolute top-[calc(1.5rem+env(safe-area-inset-top))] right-6 lg:hidden">
           <button onClick={() => setIsSidebarOpen(false)} className="h-10 w-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400">
             <X className="h-5 w-5" />
           </button>
@@ -107,8 +107,8 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        {/* Premium Single-Row Mobile Header */}
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-gray-100 bg-white px-4 lg:hidden relative z-[100] shadow-sm">
+        {/* Premium Single-Row Mobile Header (with Safe Area Support for Mobile Status Bar) */}
+        <header className="flex h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] shrink-0 items-center justify-between border-b border-gray-100 bg-white px-4 lg:hidden relative z-[100] shadow-sm">
           <div className="flex items-center gap-3">
             {/* Sidebar Toggle */}
             <button 
