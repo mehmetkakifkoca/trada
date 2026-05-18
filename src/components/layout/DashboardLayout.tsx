@@ -117,14 +117,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
             >
               <Menu className="h-5 w-5" />
             </button>
-            
-            {/* Logo */}
-            <div className="flex items-center gap-2">
-               <div className="h-8 w-8 rounded-lg bg-black flex items-center justify-center">
-                 <span className="text-white text-[10px] font-black">T</span>
-               </div>
-               <span className="text-xs font-black text-gray-900 tracking-tight">Trada</span>
-            </div>
           </div>
 
           <div className="flex items-center gap-2">
