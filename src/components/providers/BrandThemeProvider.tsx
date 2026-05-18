@@ -15,8 +15,9 @@ export function BrandThemeProvider({ children }: { children: React.ReactNode }) 
     if (secondaryColor) root.style.setProperty("--secondary", hexToOklch(secondaryColor));
     // You can add more mappings here if needed
     
-    // Update Favicon
+    // Update Favicon & Apple Touch Icon Dynamically
     if (invoiceSettings.favicon) {
+      // Browser Favicon
       let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
       if (!link) {
         link = document.createElement('link');
@@ -24,6 +25,15 @@ export function BrandThemeProvider({ children }: { children: React.ReactNode }) 
         document.getElementsByTagName('head')[0].appendChild(link);
       }
       link.href = invoiceSettings.favicon;
+
+      // Apple Touch Icon (iOS PWA Launcher Icon)
+      let appleLink = document.querySelector("link[rel='apple-touch-icon']") as HTMLLinkElement;
+      if (!appleLink) {
+        appleLink = document.createElement('link');
+        appleLink.rel = 'apple-touch-icon';
+        document.getElementsByTagName('head')[0].appendChild(appleLink);
+      }
+      appleLink.href = invoiceSettings.favicon;
     }
   }, [invoiceSettings]);
 
