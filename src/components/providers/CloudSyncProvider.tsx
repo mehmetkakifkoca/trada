@@ -1,8 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 import { useDataStore } from "@/store/data-store";
 import { useAuthStore } from "@/store/auth-store";
 
@@ -12,7 +10,7 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
   const isInitialLoad = useRef(true);
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Load data from Firebase on App Mount
+  // 1. Load data from Server API on App Mount
   useEffect(() => {
     if (!user) {
       setIsSyncing(false);
@@ -21,33 +19,35 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
 
     async function loadCloudData() {
       try {
-        console.log("[Cloud Sync] Loading data from Firebase Firestore...");
-        const docRef = doc(db, "trada_app_data", "global_state");
-        const docSnap = await getDoc(docRef);
+        console.log("[Cloud Sync] Fetching database state from server `/api/sync`...");
+        const response = await fetch("/api/sync");
+        
+        if (response.ok) {
+          const cloudData = await response.json();
+          if (cloudData) {
+            console.log("[Cloud Sync] Cloud database found! Hydrating local store...");
+            useDataStore.setState(cloudData);
+          } else {
+            console.log("[Cloud Sync] No cloud database found. Initializing with local data...");
+            // Initialize server with local storage data if empty
+            const currentLocalData = localStorage.getItem("trada-data-storage");
+            if (currentLocalData) {
+              const parsed = JSON.parse(currentLocalData);
+              if (parsed && parsed.state) {
+                const stateToSave = Object.keys(parsed.state).reduce((acc: any, key) => {
+                  if (typeof parsed.state[key] !== "function") {
+                    acc[key] = parsed.state[key];
+                  }
+                  return acc;
+                }, {});
 
-        if (docSnap.exists()) {
-          const cloudData = docSnap.data();
-          console.log("[Cloud Sync] Cloud data found! Hydrating local store...");
-          
-          // Hydrate the Zustand store with the data from Firestore
-          useDataStore.setState(cloudData);
-        } else {
-          console.log("[Cloud Sync] No cloud data found. Using local/default data.");
-          // If Firestore is empty, let's initialize it with our current local storage data
-          const currentLocalData = localStorage.getItem("trada-data-storage");
-          if (currentLocalData) {
-            const parsed = JSON.parse(currentLocalData);
-            if (parsed && parsed.state) {
-              // Extract only non-function properties from local state
-              const stateToSave = Object.keys(parsed.state).reduce((acc: any, key) => {
-                if (typeof parsed.state[key] !== "function") {
-                  acc[key] = parsed.state[key];
-                }
-                return acc;
-              }, {});
-
-              await setDoc(docRef, stateToSave);
-              console.log("[Cloud Sync] Initialized Firestore with current local data!");
+                await fetch("/api/sync", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(stateToSave),
+                });
+                console.log("[Cloud Sync] Initialized Cloud database with current local data!");
+              }
             }
           }
         }
@@ -65,26 +65,25 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
     loadCloudData();
   }, [user]);
 
-  // 2. Listen for Zustand store changes and auto-save to Firebase (Debounced)
+  // 2. Listen for Zustand store changes and auto-save to Server API (Debounced)
   useEffect(() => {
     if (!user || isSyncing) return;
 
-    console.log("[Cloud Sync] Setting up auto-save listener...");
+    console.log("[Cloud Sync] Setting up server auto-save listener...");
     
     // Subscribe to store updates
     const unsubscribe = useDataStore.subscribe((state: any) => {
       // Prevent saving on the very first load/hydration
       if (isInitialLoad.current) return;
 
-      // Debounce the save operation to avoid hitting Firestore write limits on every keystroke
+      // Debounce the save operation to avoid hitting Firebase write limits on every keystroke
       if (saveTimeoutRef.current) {
         clearTimeout(saveTimeoutRef.current);
       }
 
       saveTimeoutRef.current = setTimeout(async () => {
         try {
-          console.log("[Cloud Sync] Auto-saving changes to Firebase Firestore...");
-          const docRef = doc(db, "trada_app_data", "global_state");
+          console.log("[Cloud Sync] Auto-saving changes to Server API `/api/sync`...");
           
           // Extract only the state values, excluding functions/actions
           const stateToSave = Object.keys(state).reduce((acc: any, key) => {
@@ -94,8 +93,17 @@ export function CloudSyncProvider({ children }: { children: React.ReactNode }) {
             return acc;
           }, {});
 
-          await setDoc(docRef, stateToSave);
-          console.log("[Cloud Sync] Successfully synced changes to the Cloud!");
+          const response = await fetch("/api/sync", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(stateToSave),
+          });
+
+          if (response.ok) {
+            console.log("[Cloud Sync] Successfully synced changes to the Server Cloud Database!");
+          } else {
+            console.error("[Cloud Sync] Server responded with error during sync.");
+          }
         } catch (err) {
           console.error("[Cloud Sync] Auto-save failed:", err);
         }
