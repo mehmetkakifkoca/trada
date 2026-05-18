@@ -58,6 +58,22 @@ export default function TeamPage() {
     });
   }, [teamMembers, searchTerm]);
 
+  const stats = useMemo(() => {
+    const total = displayMembers.length;
+    const active = displayMembers.filter(member => {
+      const userLogs = attendanceLogs.filter(log => log.workerId === member.id || log.workerName.toLowerCase() === member.username.toLowerCase());
+      return userLogs[0]?.action === "Clock In";
+    }).length;
+    const totalHours = displayMembers.reduce((sum, m) => sum + (m.weeklyTargetHours || 40), 0);
+    const rolesCount = displayMembers.reduce((acc, m) => {
+      const r = m.role || "Mitarbeiter";
+      acc[r] = (acc[r] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+    
+    return { total, active, totalHours, rolesCount };
+  }, [displayMembers, attendanceLogs]);
+
   const handleOpenModal = (member?: TeamMember) => {
     if (member) {
       setEditingMember(member);
@@ -176,86 +192,174 @@ export default function TeamPage() {
         />
       </div>
 
-      {/* Grid Display */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {displayMembers.map((member) => (
-          <div key={member.id} className="relative aspect-[3/4] rounded-[48px] overflow-hidden group shadow-sm hover:shadow-2xl hover:scale-[1.02] transition-all duration-500 border border-gray-100">
-            {/* Background Image */}
-            <div className="absolute inset-0 bg-gray-50 flex items-center justify-center">
-              {member.avatarUrl ? (
-                <img src={member.avatarUrl} className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-110" />
-              ) : (
-                <UserCircle className="h-20 w-20 text-gray-200" />
-              )}
-            </div>
-
-            {/* Gradient Overlay using User's color */}
-            <div 
-              className="absolute inset-0 transition-opacity duration-500"
-              style={{ 
-                background: `linear-gradient(to top, ${member.colorTag || '#000000'}CC 0%, ${member.colorTag || '#000000'}66 30%, transparent 60%)` 
-              }}
-            />
-
-            {/* Top Badge (Role) */}
-            <div className="absolute top-6 left-6">
-               <span className="px-4 py-1.5 bg-white/20 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-white/20 shadow-xl">
-                 {member.role}
-               </span>
-            </div>
-
-            {/* Edit/Delete Actions (Hidden by default, show on hover) */}
-            <div className="absolute top-6 right-6 flex gap-2 translate-y-[-10px] opacity-0 group-hover:translate-y-0 group-hover:opacity-100 transition-all duration-300">
-               <button 
-                onClick={() => handleOpenModal(member)}
-                className="h-10 w-10 bg-white/90 backdrop-blur-md rounded-2xl flex items-center justify-center text-gray-900 hover:bg-white hover:scale-110 transition-all shadow-xl"
-               >
-                 <Edit2 className="h-4 w-4" />
-               </button>
-               <button 
-                onClick={() => handleDelete(member.id)}
-                className="h-10 w-10 bg-red-500/90 backdrop-blur-md rounded-2xl flex items-center justify-center text-white hover:bg-red-600 hover:scale-110 transition-all shadow-xl"
-               >
-                 <Trash2 className="h-4 w-4" />
-               </button>
-            </div>
-
-            {/* Bottom Content */}
-            <div className="absolute inset-x-0 bottom-0 p-8 space-y-4">
-              <div className="space-y-1">
-                <div className="flex items-center gap-3">
-                  <h3 className="text-2xl font-black text-white tracking-tight drop-shadow-md">{member.fullName}</h3>
-                  {(() => {
-                    const userLogs = attendanceLogs.filter(log => log.workerId === member.id || log.workerName.toLowerCase() === member.username.toLowerCase());
-                    const isWorking = userLogs[0]?.action === "Clock In";
-                    if (!isWorking) return null;
-                    return (
-                      <div className="flex items-center gap-2 bg-emerald-500 px-2 py-0.5 rounded-full shadow-lg shadow-emerald-500/50 animate-pulse">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white"></span>
-                        <span className="text-[8px] font-black text-white uppercase tracking-tighter">Live</span>
-                      </div>
-                    );
-                  })()}
-                </div>
-                <p className="text-[11px] font-bold text-white/80 uppercase tracking-[0.2em] flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: member.colorTag }} />
-                  @{member.username}
-                </p>
-              </div>
-
-              <div className="flex items-center justify-between pt-4 border-t border-white/20">
-                 <div className="flex items-center gap-2 text-white/90">
-                    <ShieldCheck className="h-4 w-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{member.permissions?.length || 0} Module</span>
-                 </div>
-                 <div className="flex items-center gap-2 text-white/90">
-                    <Clock className="h-4 w-4" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">{member.weeklyTargetHours || 40}h</span>
-                 </div>
-              </div>
-            </div>
+      {/* KPI Stats Row for General Overview */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* Total Members */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] block">Gesamtstärke</span>
+            <h3 className="text-2xl font-black text-gray-900">{stats.total}</h3>
+            <p className="text-[10px] font-bold text-gray-400">Teammitglieder registriert</p>
           </div>
-        ))}
+          <div className="h-12 w-12 rounded-2xl bg-blue-50 text-blue-500 flex items-center justify-center shrink-0">
+            <UsersIcon className="h-6 w-6" />
+          </div>
+        </div>
+
+        {/* Currently Clocked In */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] block">Live Aktiv</span>
+            <h3 className="text-2xl font-black text-emerald-600 flex items-center gap-2">
+              {stats.active}
+              <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-ping inline-block" />
+            </h3>
+            <p className="text-[10px] font-bold text-gray-400">Arbeiten gerade live</p>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center shrink-0">
+            <Clock className="h-6 w-6" />
+          </div>
+        </div>
+
+        {/* Capacity / Total Weekly Target Hours */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] block">Soll-Kapazität</span>
+            <h3 className="text-2xl font-black text-gray-900">{stats.totalHours}h</h3>
+            <p className="text-[10px] font-bold text-gray-400">Soll-Wochenstunden gesamt</p>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-orange-50 text-orange-500 flex items-center justify-center shrink-0">
+            <Clock className="h-6 w-6" />
+          </div>
+        </div>
+
+        {/* Roles Distribution Quick Insights */}
+        <div className="bg-white p-6 rounded-[32px] border border-gray-100/80 shadow-[0_10px_30px_rgba(0,0,0,0.02)] flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] block">Rollenverteilung</span>
+            <h3 className="text-sm font-black text-gray-900 truncate max-w-[170px]">
+              {Object.entries(stats.rolesCount)
+                .slice(0, 2)
+                .map(([role, count]) => `${count}x ${role}`)
+                .join(", ") || "Keine Rollen"}
+            </h3>
+            <p className="text-[10px] font-bold text-gray-400">Häufigste Rollen im Team</p>
+          </div>
+          <div className="h-12 w-12 rounded-2xl bg-violet-50 text-violet-500 flex items-center justify-center shrink-0">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+        </div>
+      </div>
+
+      {/* Sleek Minimal Grid Display */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {displayMembers.map((member) => {
+          const userLogs = attendanceLogs.filter(
+            log => log.workerId === member.id || log.workerName.toLowerCase() === member.username.toLowerCase()
+          );
+          const isWorking = userLogs[0]?.action === "Clock In";
+          
+          return (
+            <div 
+              key={member.id} 
+              className="bg-white rounded-[32px] border border-gray-100/80 p-6 shadow-[0_10px_30px_rgba(0,0,0,0.02)] hover:shadow-xl hover:scale-[1.01] transition-all duration-300 flex flex-col justify-between gap-6 relative group"
+            >
+              {/* Card Top: Avatar and Identity */}
+              <div className="flex items-start gap-4">
+                <div className="relative">
+                  <div className="h-16 w-16 rounded-2xl overflow-hidden bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 shadow-inner">
+                    {member.avatarUrl ? (
+                      <img src={member.avatarUrl} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center text-xl font-black text-gray-400 bg-gray-100 uppercase" style={{ color: member.colorTag }}>
+                        {member.fullName.charAt(0)}
+                      </div>
+                    )}
+                  </div>
+                  {/* Status Indicator */}
+                  <span className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white flex items-center justify-center ${
+                    isWorking ? "bg-emerald-500 animate-pulse" : "bg-gray-300"
+                  }`} title={isWorking ? "Am Arbeiten" : "Offline"} />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-lg font-black text-gray-900 truncate leading-tight group-hover:text-brand-secondary transition-colors">
+                      {member.fullName}
+                    </h3>
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest truncate">
+                    @{member.username}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <span 
+                      className="px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border"
+                      style={{ 
+                        color: member.colorTag || '#3B82F6', 
+                        borderColor: `${member.colorTag || '#3B82F6'}20`,
+                        backgroundColor: `${member.colorTag || '#3B82F6'}08` 
+                      }}
+                    >
+                      {member.role || "Mitarbeiter"}
+                    </span>
+                    {isWorking && (
+                      <span className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest animate-pulse">
+                        LIVE
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Card Divider */}
+              <div className="h-px bg-gray-50 w-full" />
+
+              {/* Card Middle: Capacity and Modules */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">Wochenstunden</span>
+                  <div className="flex items-center gap-1.5 text-gray-700 font-bold text-xs">
+                    <Clock className="h-3.5 w-3.5 text-gray-400" />
+                    <span>{member.weeklyTargetHours || 40} Std / Soll</span>
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest block">Zugriff</span>
+                  <div className="flex items-center gap-1.5 text-gray-700 font-bold text-xs">
+                    <ShieldCheck className="h-3.5 w-3.5 text-gray-400" />
+                    <span>{member.permissions?.length || 0} Module</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hourly Cost - Only for CEO/Superadmin to keep it clean but functional */}
+              {isSuperAdmin && member.hourlyCost ? (
+                <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex items-center justify-between text-[10px] font-bold text-gray-500">
+                  <span className="uppercase tracking-wider">Effektiver Stundensatz:</span>
+                  <span className="text-gray-900 font-black text-xs">
+                    €{((member.hourlyCost || 0) * (member.costMultiplier || 1)).toFixed(2)} /h
+                  </span>
+                </div>
+              ) : null}
+
+              {/* Action Buttons: Minimal footer actions */}
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                <button 
+                  onClick={() => handleOpenModal(member)}
+                  className="px-4 py-2 bg-gray-50 hover:bg-black hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 border border-gray-100"
+                >
+                  <Edit2 className="h-3 w-3" /> Bearbeiten
+                </button>
+                <button 
+                  onClick={() => handleDelete(member.id)}
+                  className="px-4 py-2 bg-red-50 hover:bg-red-500 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest text-red-500 transition-all flex items-center gap-1.5 border border-red-100/50"
+                >
+                  <Trash2 className="h-3 w-3" /> Löschen
+                </button>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {isModalOpen && (
