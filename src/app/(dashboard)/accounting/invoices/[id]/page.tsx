@@ -8,7 +8,8 @@ import {
   InvoicePosition, 
   InvoiceType, 
   Customer, 
-  Product 
+  Product,
+  SYSTEM_CATEGORIES
 } from "@/store/data-store";
 import { 
   Plus, 
@@ -541,6 +542,17 @@ export default function InvoiceEditorPage() {
                       onChange={(e) => setInvoice({...invoice, type: e.target.value as any})}
                      >
                        {INVOICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                     </select>
+                  </div>
+                  <div className="space-y-2">
+                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kategorie</label>
+                     <select 
+                      className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm outline-none appearance-none"
+                      value={invoice.category || ""}
+                      onChange={(e) => setInvoice({...invoice, category: e.target.value})}
+                     >
+                       <option value="">Keine Kategorie</option>
+                       {SYSTEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                      </select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">

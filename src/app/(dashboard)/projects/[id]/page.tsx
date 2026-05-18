@@ -10,7 +10,8 @@ import {
   ProjectExpense, 
   AdminProjectHour, 
   TimeAllocation,
-  ProjectStatus
+  ProjectStatus,
+  SYSTEM_CATEGORIES
 } from "@/store/data-store";
 import { 
   ChevronLeft, 
@@ -405,10 +406,7 @@ function TasksTab({ project, isCEO }: any) {
                   value={newTask.category}
                   onChange={(e) => setNewTask({...newTask, category: e.target.value})}
                 >
-                  <option value="Design">Design</option>
-                  <option value="Programming">Programming</option>
-                  <option value="Consulting">Consulting</option>
-                  <option value="Production">Production</option>
+                  {SYSTEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
                 <div className="flex gap-4">
                    <input 
@@ -481,12 +479,15 @@ function ExpensesTab({ project, isCEO }: any) {
   });
 
   const mapCategory = (cat: string): ProjectExpense["category"] => {
+    // If it's already a valid category from SYSTEM_CATEGORIES, return it
+    if (SYSTEM_CATEGORIES.includes(cat as any)) return cat;
+    // Map old legacy strings just in case
     switch(cat) {
-      case "Software": return "Software";
-      case "Marketing": return "Advertising";
-      case "Reisekosten": return "Travel";
-      case "Hardware": return "Material";
-      default: return "Other";
+      case "Marketing": return "Marketing & Ads";
+      case "Hardware": return "Hardware & Equipment";
+      case "Advertising": return "Marketing & Ads";
+      case "Printing": return "Print & Tabela";
+      default: return "Sonstiges";
     }
   };
 
@@ -619,14 +620,7 @@ function ExpensesTab({ project, isCEO }: any) {
 
                  <input placeholder="Titel der Ausgabe..." className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none" value={newExpense.title} onChange={(e)=>setNewExpense({...newExpense, title: e.target.value})} />
                  <select className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none appearance-none" value={newExpense.category} onChange={(e)=>setNewExpense({...newExpense, category: e.target.value as any})}>
-                   <option value="Material">Material</option>
-                   <option value="Printing">Druckkosten</option>
-                   <option value="Production">Produktion</option>
-                   <option value="Travel">Reisekosten</option>
-                   <option value="Software">Software</option>
-                   <option value="Freelancer">Freelancer</option>
-                   <option value="Advertising">Werbung</option>
-                   <option value="Other">Andere</option>
+                   {SYSTEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                  </select>
                  <div className="flex gap-4">
                     <input type="number" placeholder="Betrag (€)" className="flex-1 px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none font-bold" value={newExpense.amount || ""} onChange={(e)=>setNewExpense({...newExpense, amount: Number(e.target.value) || 0})} />

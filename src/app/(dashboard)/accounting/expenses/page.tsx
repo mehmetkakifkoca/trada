@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { useDataStore, Expense } from "@/store/data-store";
+import { useDataStore, Expense, SYSTEM_CATEGORIES } from "@/store/data-store";
 import { 
   Plus, 
   Search, 
@@ -97,14 +97,18 @@ export default function ExpensesPage() {
     fileType: ""
   });
 
-  const categories = [
-    { name: "Software", icon: Zap, color: "text-blue-500 bg-blue-50" },
-    { name: "Marketing", icon: ShoppingBag, color: "text-indigo-500 bg-indigo-50" },
-    { name: "Bewirtung", icon: Coffee, color: "text-orange-500 bg-orange-50" },
-    { name: "Reisekosten", icon: Car, color: "text-emerald-500 bg-emerald-50" },
-    { name: "Hardware", icon: ShoppingBag, color: "text-purple-500 bg-purple-50" },
-    { name: "Sonstiges", icon: ShoppingBag, color: "text-gray-500 bg-gray-50" },
-  ];
+  const categories = SYSTEM_CATEGORIES.map(name => {
+    let icon = ShoppingBag;
+    let color = "text-gray-500 bg-gray-50";
+    if (name.includes("Software")) { icon = Zap; color = "text-blue-500 bg-blue-50"; }
+    else if (name.includes("Marketing")) { icon = Zap; color = "text-indigo-500 bg-indigo-50"; }
+    else if (name.includes("Bewirtung")) { icon = Coffee; color = "text-orange-500 bg-orange-50"; }
+    else if (name.includes("Reisekosten") || name.includes("Travel")) { icon = Car; color = "text-emerald-500 bg-emerald-50"; }
+    else if (name.includes("Hardware")) { icon = Zap; color = "text-purple-500 bg-purple-50"; }
+    else if (name.includes("Design") || name.includes("Video")) { color = "text-pink-500 bg-pink-50"; }
+    else if (name.includes("Social")) { color = "text-cyan-500 bg-cyan-50"; }
+    return { name, icon, color };
+  });
 
   const filteredExpenses = expenses.filter(e => 
     e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||

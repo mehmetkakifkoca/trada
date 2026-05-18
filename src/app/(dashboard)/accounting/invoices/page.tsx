@@ -34,7 +34,11 @@ import {
   Play,
   Pause,
   History,
-  Calendar
+  Calendar,
+  Sparkles,
+  FileSpreadsheet,
+  UploadCloud,
+  Check
 } from "lucide-react";
 import { toast } from "sonner";
 import { format } from "date-fns";
@@ -61,7 +65,7 @@ export default function InvoicesDashboard() {
   } = useDataStore();
   
   // Tabs & Views
-  const [viewMode, setViewMode] = useState<"ALL" | "RECURRING">("ALL");
+  const [viewMode, setViewMode] = useState<"ALL" | "RECURRING" | "BANK">("ALL");
 
   // Filter & State
   const [searchTerm, setSearchTerm] = useState("");
@@ -236,9 +240,16 @@ export default function InvoicesDashboard() {
         >
           Wiederkehrende Rechnungen
         </button>
+        <button 
+          onClick={() => setViewMode("BANK")}
+          className={`pb-4 text-sm font-bold transition-all border-b-2 ${viewMode === "BANK" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"} flex items-center gap-2`}
+        >
+          <Sparkles className="h-4 w-4 text-brand-secondary" />
+          <span>Bankabgleich (Kontoauszug)</span>
+        </button>
       </div>
 
-      {viewMode === "ALL" ? (
+      {viewMode === "ALL" && (
         <div className="bg-white rounded-[32px] border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300">
           <div className="p-6 border-b border-gray-100 space-y-6">
             <div className="flex flex-wrap items-center gap-2">
@@ -289,6 +300,9 @@ export default function InvoicesDashboard() {
                   <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-pointer hover:text-black transition-colors" onClick={() => handleSort('customerName')}>
                     <div className="flex items-center gap-2">Kunde <ArrowUpDown className="h-3 w-3" /></div>
                   </th>
+                  <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-pointer hover:text-black transition-colors" onClick={() => handleSort('category' as any)}>
+                    <div className="flex items-center gap-2">Kategorie <ArrowUpDown className="h-3 w-3" /></div>
+                  </th>
                   <th className="px-6 py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest cursor-pointer hover:text-black transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center gap-2">Datum <ArrowUpDown className="h-3 w-3" /></div>
                   </th>
@@ -310,6 +324,9 @@ export default function InvoicesDashboard() {
                         <span className="text-sm font-bold text-gray-900">{inv.customerName}</span>
                         <span className="text-[10px] text-gray-400 font-medium">{inv.email}</span>
                       </div>
+                    </td>
+                    <td className="px-6 py-5">
+                      <span className="text-sm font-bold text-gray-500">{inv.category || "-"}</span>
                     </td>
                     <td className="px-6 py-5">
                       <span className="text-sm text-gray-500 font-medium">{inv.date}</span>
@@ -387,7 +404,8 @@ export default function InvoicesDashboard() {
             </table>
           </div>
         </div>
-      ) : (
+      )}
+      {viewMode === "RECURRING" && (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-300">
            {recurringConfigs.length === 0 ? (
              <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-20 flex flex-col items-center justify-center text-center">
@@ -459,6 +477,10 @@ export default function InvoicesDashboard() {
         </div>
       )}
 
+      {viewMode === "BANK" && (
+        <BankReconciliationView invoices={invoices} updateInvoice={updateInvoice} />
+      )}
+
       {isPartialModalOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[100] flex items-center justify-center p-4">
           <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
@@ -523,6 +545,585 @@ export default function InvoicesDashboard() {
                 <Plus className="h-5 w-5" /> Teilrechnung erstellen
               </button>
             </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==========================================
+// BANK RECONCILIATION COMPONENT
+// ==========================================
+interface BankTx {
+  id: string;
+  date: string;
+  partnerName: string;
+  purpose: string;
+  amount: number;
+  matchedInvoice?: Invoice;
+  confidence?: "EXACT" | "HIGH" | "MEDIUM" | "LOW" | "NONE";
+  confidenceLabel?: string;
+  status: "PENDING" | "RECONCILED" | "IGNORED";
+}
+
+function BankReconciliationView({ invoices, updateInvoice }: { invoices: Invoice[]; updateInvoice: any }) {
+  const [transactions, setTransactions] = useState<BankTx[]>([]);
+  const [fileName, setFileName] = useState("");
+  const [dragActive, setDragActive] = useState(false);
+
+  // Unpaid invoices
+  const unpaidInvoices = useMemo(() => {
+    return invoices.filter(inv => inv.status === "OFFEN" || inv.status === "OVERDUE");
+  }, [invoices]);
+
+  const parseAmount = (valStr: string): number => {
+    if (!valStr) return 0;
+    let clean = valStr.replace(/\./g, '');
+    clean = clean.replace(/,/g, '.');
+    clean = clean.replace(/[^0-9.-]/g, '');
+    return parseFloat(clean) || 0;
+  };
+
+  const processCSVContent = (text: string) => {
+    const lines = text.split(/\r?\n/).filter(line => line.trim());
+    if (lines.length === 0) {
+      toast.error("Die hochgeladene Datei ist leer.");
+      return;
+    }
+
+    const firstLine = lines[0];
+    const commaCount = (firstLine.match(/,/g) || []).length;
+    const semicolonCount = (firstLine.match(/;/g) || []).length;
+    const sep = semicolonCount > commaCount ? ';' : ',';
+
+    const parseLine = (line: string) => {
+      const result = [];
+      let current = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const char = line[i];
+        if (char === '"') {
+          inQuotes = !inQuotes;
+        } else if (char === sep && !inQuotes) {
+          result.push(current.trim().replace(/^"|"$/g, ''));
+          current = '';
+        } else {
+          current += char;
+        }
+      }
+      result.push(current.trim().replace(/^"|"$/g, ''));
+      return result;
+    };
+
+    const headers = parseLine(lines[0]).map(h => h.toLowerCase());
+    
+    // Key mappings
+    const dateKws = ['datum', 'tag', 'date', 'valuta', 'buchungstext'];
+    const nameKws = ['name', 'empfänger', 'auftraggeber', 'begünstigter', 'zahler', 'partner', 'payee'];
+    const purposeKws = ['verwendungszweck', 'betreff', 'zweck', 'beschreibung', 'details', 'reference', 'info', 'text'];
+    const amountKws = ['betrag', 'umsatz', 'wert', 'amount', 'summe'];
+
+    const getColumnIndex = (kws: string[]) => {
+      return headers.findIndex(h => kws.some(kw => h.includes(kw)));
+    };
+
+    const dateIdx = getColumnIndex(dateKws);
+    const nameIdx = getColumnIndex(nameKws);
+    const purposeIdx = getColumnIndex(purposeKws);
+    const amountIdx = getColumnIndex(amountKws);
+
+    if (amountIdx === -1) {
+      toast.error("Betrag-Spalte konnte im CSV-Kontoauszug nicht automatisch ermittelt werden.");
+      return;
+    }
+
+    const parsedTxs: BankTx[] = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cells = parseLine(lines[i]);
+      if (cells.length === 0) continue;
+
+      const dateVal = dateIdx !== -1 ? cells[dateIdx] || '' : new Date().toISOString().split('T')[0];
+      const partnerVal = nameIdx !== -1 ? cells[nameIdx] || '' : 'Unbekannter Partner';
+      const purposeVal = purposeIdx !== -1 ? cells[purposeIdx] || '' : '';
+      const amountVal = parseAmount(cells[amountIdx] || '0');
+
+      // Reconcile incoming positive bank transfers only (meaning income)
+      if (amountVal <= 0) continue;
+
+      // Smart matching against unpaid invoices
+      let matchedInv: Invoice | undefined;
+      let conf: BankTx["confidence"] = "NONE";
+      let confLabel = "";
+
+      for (const inv of unpaidInvoices) {
+        const invIdUpper = inv.id.toUpperCase();
+        const purposeUpper = purposeVal.toUpperCase();
+        const custNameUpper = inv.customerName.toUpperCase();
+        const partnerUpper = partnerVal.toUpperCase();
+
+        const cleanInvId = inv.id.replace(/[^0-9]/g, '');
+        const hasInvNumberInPurpose = cleanInvId && purposeUpper.includes(cleanInvId);
+
+        const amountMatches = Math.abs(amountVal - inv.amountGross) < 0.05;
+
+        if (amountMatches && (purposeUpper.includes(invIdUpper) || hasInvNumberInPurpose)) {
+          matchedInv = inv;
+          conf = "EXACT";
+          confLabel = "Exakte ID & Betrag";
+          break; // Perfect match, stop searching
+        } else if (amountMatches && (purposeUpper.includes(custNameUpper) || partnerUpper.includes(custNameUpper))) {
+          matchedInv = inv;
+          conf = "HIGH";
+          confLabel = "Kunde & Betrag";
+        } else if (amountMatches && conf === "NONE") {
+          matchedInv = inv;
+          conf = "LOW";
+          confLabel = "Nur Betrag";
+        } else if ((purposeUpper.includes(invIdUpper) || hasInvNumberInPurpose) && conf === "NONE") {
+          matchedInv = inv;
+          conf = "MEDIUM";
+          confLabel = "Abweichender Betrag";
+        }
+      }
+
+      parsedTxs.push({
+        id: `TX-${i}-${Math.random().toString(36).substr(2, 4)}`,
+        date: dateVal,
+        partnerName: partnerVal,
+        purpose: purposeVal,
+        amount: amountVal,
+        matchedInvoice: matchedInv,
+        confidence: conf,
+        confidenceLabel: confLabel || "Keine Übereinstimmung",
+        status: "PENDING"
+      });
+    }
+
+    setTransactions(parsedTxs);
+    toast.success(`${parsedTxs.length} eingehende Transaktionen geladen!`);
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const text = event.target?.result as string;
+      processCSVContent(text);
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  const handleDrag = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.type === "dragenter" || e.type === "dragover") {
+      setDragActive(true);
+    } else if (e.type === "dragleave") {
+      setDragActive(false);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.name.endsWith('.csv')) {
+      setFileName(file.name);
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        processCSVContent(text);
+      };
+      reader.readAsText(file, "UTF-8");
+    } else {
+      toast.error("Bitte laden Sie nur gültige CSV-Dateien hoch.");
+    }
+  };
+
+  const simulateDemoData = () => {
+    setFileName("kontoauszug_simuliert.csv");
+    
+    // Let's build demo data that matches some unpaid invoices if they exist
+    const demoTxs: BankTx[] = [];
+    
+    if (unpaidInvoices.length > 0) {
+      unpaidInvoices.forEach((inv, index) => {
+        // EXACT match
+        if (index === 0) {
+          demoTxs.push({
+            id: `TX-DEMO-${inv.id}`,
+            date: new Date().toISOString().split('T')[0],
+            partnerName: inv.customerName,
+            purpose: `Rechnung ${inv.id} - Trada Space CRM`,
+            amount: inv.amountGross,
+            matchedInvoice: inv,
+            confidence: "EXACT",
+            confidenceLabel: "Exakte ID & Betrag",
+            status: "PENDING"
+          });
+        } 
+        // HIGH match
+        else if (index === 1) {
+          demoTxs.push({
+            id: `TX-DEMO-${inv.id}`,
+            date: new Date().toISOString().split('T')[0],
+            partnerName: inv.customerName,
+            purpose: `Dienstleistungen Social Media Consulting`,
+            amount: inv.amountGross,
+            matchedInvoice: inv,
+            confidence: "HIGH",
+            confidenceLabel: "Kunde & Betrag",
+            status: "PENDING"
+          });
+        }
+        // LOW match
+        else {
+          demoTxs.push({
+            id: `TX-DEMO-${inv.id}`,
+            date: new Date().toISOString().split('T')[0],
+            partnerName: "Andere Firma GmbH",
+            purpose: "Monatspauschale Support",
+            amount: inv.amountGross,
+            matchedInvoice: inv,
+            confidence: "LOW",
+            confidenceLabel: "Nur Betrag",
+            status: "PENDING"
+          });
+        }
+      });
+    }
+
+    // Add some random unmatched transaction
+    demoTxs.push({
+      id: "TX-DEMO-UNMATCHED-1",
+      date: new Date().toISOString().split('T')[0],
+      partnerName: "Google Ireland Ltd.",
+      purpose: "Rückerstattung Google Ads Gutschrift",
+      amount: 150.00,
+      confidence: "NONE",
+      confidenceLabel: "Keine Übereinstimmung",
+      status: "PENDING"
+    });
+
+    demoTxs.push({
+      id: "TX-DEMO-UNMATCHED-2",
+      date: new Date().toISOString().split('T')[0],
+      partnerName: "Max Mustermann",
+      purpose: "Private Zahlung",
+      amount: 85.00,
+      confidence: "NONE",
+      confidenceLabel: "Keine Übereinstimmung",
+      status: "PENDING"
+    });
+
+    setTransactions(demoTxs);
+    toast.success("Demo-Kontoauszug erfolgreich simuliert!");
+  };
+
+  const reconcileSingle = (txId: string, invoiceId: string, txDate: string, amount: number) => {
+    updateInvoice(invoiceId, {
+      status: "BEZAHLT",
+      amountPaid: amount,
+      history: [
+        {
+          date: new Date().toISOString(),
+          action: `Bankabgleich: Kontoauszug-Eingang am ${txDate} verbucht`,
+          user: "System"
+        }
+      ]
+    });
+
+    setTransactions(prev => 
+      prev.map(tx => tx.id === txId ? { ...tx, status: "RECONCILED" as const } : tx)
+    );
+    toast.success(`Rechnung ${invoiceId} erfolgreich als bezahlt markiert!`);
+  };
+
+  const reconcileAllMatches = () => {
+    let count = 0;
+    transactions.forEach(tx => {
+      if (tx.status === "PENDING" && tx.matchedInvoice && (tx.confidence === "EXACT" || tx.confidence === "HIGH")) {
+        updateInvoice(tx.matchedInvoice.id, {
+          status: "BEZAHLT",
+          amountPaid: tx.amount,
+          history: [
+            {
+              date: new Date().toISOString(),
+              action: `Bankabgleich: Automatische Sammelbuchung am ${tx.date}`,
+              user: "System"
+            }
+          ]
+        });
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      setTransactions(prev => 
+        prev.map(tx => (tx.status === "PENDING" && tx.matchedInvoice && (tx.confidence === "EXACT" || tx.confidence === "HIGH")) ? { ...tx, status: "RECONCILED" as const } : tx)
+      );
+      toast.success(`${count} Rechnungen wurden automatisch abgeglichen!`);
+    } else {
+      toast.info("Keine eindeutigen Übereinstimmungen zum automatischen Buchen vorhanden.");
+    }
+  };
+
+  const discardTransaction = (txId: string) => {
+    setTransactions(prev => 
+      prev.map(tx => tx.id === txId ? { ...tx, status: "IGNORED" as const } : tx)
+    );
+    toast.info("Transaktion ignoriert.");
+  };
+
+  const resetAll = () => {
+    setTransactions([]);
+    setFileName("");
+  };
+
+  const pendingMatches = transactions.filter(tx => tx.status === "PENDING" && tx.matchedInvoice);
+  const pendingCount = pendingMatches.length;
+
+  return (
+    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-white rounded-[40px] border border-gray-100 p-8 shadow-sm">
+        <h3 className="text-2xl font-black text-gray-900 tracking-tight">Kontoauszug Bankabgleich (Reconciliation)</h3>
+        <p className="text-sm text-gray-500 mt-2 font-medium">
+          Laden Sie Ihre monatliche Bank-Exportdatei (CSV) hoch. Unser System gleicht eingehende Zahlungen mit Ihren offenen Rechnungen ab.
+        </p>
+      </div>
+
+      {transactions.length === 0 ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Drag & Drop Upload Zone */}
+          <div className="lg:col-span-2">
+            <div 
+              onDragEnter={handleDrag}
+              onDragOver={handleDrag}
+              onDragLeave={handleDrag}
+              onDrop={handleDrop}
+              className={`h-[400px] border-4 border-dashed rounded-[48px] flex flex-col items-center justify-center text-center p-10 transition-all ${
+                dragActive 
+                  ? "border-brand-secondary bg-brand-secondary/5 scale-98" 
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <div className="h-20 w-20 bg-gray-50 rounded-[28px] flex items-center justify-center mb-6 shadow-inner text-gray-400 transition-colors">
+                <UploadCloud className="h-10 w-10 text-gray-400" />
+              </div>
+              <h4 className="text-xl font-bold text-gray-900">Kontoauszug hochladen (.CSV)</h4>
+              <p className="text-xs text-gray-400 max-w-sm mt-3 leading-relaxed font-medium">
+                Komma- oder Strichpunkt-separierte Kontoauszüge deutscher Banken (Sparkasse, Deutsche Bank, Volksbank, N26, Stripe, etc.) werden vollautomatisch eingelesen.
+              </p>
+              
+              <div className="mt-8 flex items-center gap-4">
+                <label className="px-6 py-3.5 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl cursor-pointer">
+                  Datei Auswählen
+                  <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} />
+                </label>
+                
+                <button 
+                  onClick={simulateDemoData}
+                  className="px-6 py-3.5 bg-brand-secondary/10 text-brand-secondary border border-brand-secondary/20 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-brand-secondary/20 transition-all flex items-center gap-1.5"
+                >
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>Demo-Daten simulieren</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Help / Instructions panel */}
+          <div className="bg-white rounded-[40px] border border-gray-100 p-8 space-y-6">
+            <h4 className="text-lg font-bold text-gray-900">Wie funktioniert es?</h4>
+            <div className="space-y-4">
+              <div className="flex gap-4">
+                <div className="h-8 w-8 bg-gray-50 rounded-lg flex items-center justify-center text-xs font-black text-gray-900 shrink-0">1</div>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Exportieren Sie Ihren Kontoauszug bei Ihrer Bank als <strong>CSV-Datei</strong>.
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <div className="h-8 w-8 bg-gray-50 rounded-lg flex items-center justify-center text-xs font-black text-gray-900 shrink-0">2</div>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Unser intelligenter Parser erkennt automatisch Spalten wie Buchungstext, Betrag und Verwendungszweck.
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <div className="h-8 w-8 bg-gray-50 rounded-lg flex items-center justify-center text-xs font-black text-gray-900 shrink-0">3</div>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Das System gleicht den Betrag und Verwendungszweck mit Ihren <strong>offenen Rechnungen ({unpaidInvoices.length})</strong> ab.
+                </p>
+              </div>
+              <div className="flex gap-4">
+                <div className="h-8 w-8 bg-gray-50 rounded-lg flex items-center justify-center text-xs font-black text-gray-900 shrink-0">4</div>
+                <p className="text-xs text-gray-500 font-medium leading-relaxed">
+                  Sie überprüfen die Zuweisungen und markieren die Rechnungen mit einem Klick als <strong>Bezahlt</strong>. Einnahmen fließen sofort in Ihre Live-Finanzen!
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {/* File loaded stats header */}
+          <div className="bg-white rounded-[40px] border border-gray-100 p-8 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <div className="px-3 py-1 bg-brand-secondary/10 text-brand-secondary text-[9px] font-black uppercase tracking-widest rounded-full flex items-center gap-1">
+                  <FileSpreadsheet className="h-3 w-3" /> {fileName}
+                </div>
+                <span className="text-xs text-gray-400 font-medium">({transactions.length} Zeilen eingelesen)</span>
+              </div>
+              <h4 className="text-xl font-bold text-gray-900">{pendingCount} Übereinstimmungen gefunden</h4>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {pendingCount > 0 && (
+                <button 
+                  onClick={reconcileAllMatches}
+                  className="px-6 py-3.5 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-xl shadow-black/10 flex items-center gap-2"
+                >
+                  <Check className="h-4 w-4" />
+                  <span>Alle Übereinstimmungen verbuchen</span>
+                </button>
+              )}
+              <button 
+                onClick={resetAll}
+                className="px-6 py-3.5 bg-gray-100 text-gray-500 hover:text-black rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all"
+              >
+                Kontoauszug Zurücksetzen
+              </button>
+            </div>
+          </div>
+
+          {/* Matched Transactions List */}
+          <div className="space-y-4">
+            <h4 className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2">Vorschlagsliste & Abgleich</h4>
+            
+            {transactions.filter(t => t.status === "PENDING").map((tx) => (
+              <div 
+                key={tx.id} 
+                className={`bg-white rounded-[32px] border p-8 flex flex-col lg:flex-row items-center justify-between gap-6 transition-all hover:shadow-lg ${
+                  tx.matchedInvoice 
+                    ? tx.confidence === "EXACT" || tx.confidence === "HIGH" 
+                      ? "border-emerald-100 hover:border-emerald-200" 
+                      : "border-orange-100 hover:border-orange-200" 
+                    : "border-gray-100 bg-gray-50/10"
+                }`}
+              >
+                {/* Left: Bank statement details */}
+                <div className="flex-1 space-y-3 min-w-0">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{tx.date}</span>
+                    <span className="px-2.5 py-0.5 bg-gray-100 text-gray-500 rounded-full text-[9px] font-black uppercase tracking-widest">Eingehende Zahlung</span>
+                  </div>
+                  <div>
+                    <h5 className="text-base font-bold text-gray-900 truncate" title={tx.partnerName}>{tx.partnerName}</h5>
+                    <p className="text-xs text-gray-400 font-medium mt-1 truncate" title={tx.purpose}>{tx.purpose || 'Kein Verwendungszweck angegeben'}</p>
+                  </div>
+                  <div className="text-lg font-black text-emerald-600">
+                    + €{tx.amount.toLocaleString()}
+                  </div>
+                </div>
+
+                {/* Middle: Connection line / Indicator */}
+                <div className="hidden lg:flex flex-col items-center justify-center px-4">
+                  {tx.matchedInvoice ? (
+                    <div className="h-10 w-10 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600">
+                      <CheckCircle2 className="h-5 w-5" />
+                    </div>
+                  ) : (
+                    <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-300">
+                      <AlertCircle className="h-5 w-5" />
+                    </div>
+                  )}
+                  <div className="h-4 w-px bg-gray-100 my-1" />
+                </div>
+
+                {/* Right: Matched invoice card */}
+                <div className="flex-1 space-y-4 w-full lg:w-auto">
+                  {tx.matchedInvoice ? (
+                    <div className={`p-6 rounded-2xl border ${
+                      tx.confidence === "EXACT" || tx.confidence === "HIGH" 
+                        ? "bg-emerald-50/30 border-emerald-100" 
+                        : "bg-orange-50/30 border-orange-100"
+                    }`}>
+                      <div className="flex items-center justify-between gap-3 mb-3">
+                        <span className="text-xs font-black text-gray-900">{tx.matchedInvoice.id}</span>
+                        <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                          tx.confidence === "EXACT" 
+                            ? "bg-emerald-500 text-white" 
+                            : tx.confidence === "HIGH" 
+                              ? "bg-emerald-100 text-emerald-700" 
+                              : "bg-orange-100 text-orange-700"
+                        }`}>
+                          {tx.confidenceLabel}
+                        </span>
+                      </div>
+                      <p className="text-xs font-bold text-gray-900">{tx.matchedInvoice.customerName}</p>
+                      <div className="flex justify-between items-end mt-4">
+                        <div>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Rechnungssumme</p>
+                          <p className="text-sm font-black text-gray-900">€{tx.matchedInvoice.amountGross.toLocaleString()}</p>
+                        </div>
+                        
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => reconcileSingle(tx.id, tx.matchedInvoice!.id, tx.date, tx.amount)}
+                            className="px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 transition-all shadow-md shadow-emerald-600/10"
+                          >
+                            Zahlung verbuchen
+                          </button>
+                          <button 
+                            onClick={() => discardTransaction(tx.id)}
+                            className="p-2 bg-gray-100 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            title="Ignorieren"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="p-6 rounded-2xl bg-gray-50 border border-gray-100 flex flex-col items-center justify-center text-center h-full min-h-[140px] space-y-2">
+                      <AlertCircle className="h-6 w-6 text-gray-300" />
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Keine Übereinstimmung</p>
+                      <p className="text-[11px] text-gray-400 font-medium">Rechnung ID oder Kunde im Buchungstext nicht gefunden.</p>
+                      <button 
+                        onClick={() => discardTransaction(tx.id)}
+                        className="text-[9px] font-black uppercase tracking-widest text-gray-400 hover:text-red-500 transition-colors mt-2"
+                      >
+                        Ignorieren
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+
+            {transactions.filter(t => t.status === "PENDING").length === 0 && (
+              <div className="bg-white rounded-[40px] border border-gray-100 p-20 text-center space-y-4 shadow-sm">
+                <div className="h-16 w-16 bg-emerald-50 rounded-full flex items-center justify-center text-emerald-600 mx-auto">
+                  <CheckCircle2 className="h-8 w-8" />
+                </div>
+                <h4 className="text-xl font-bold text-gray-900">Alles abgeglichen!</h4>
+                <p className="text-xs text-gray-400 max-w-xs mx-auto leading-relaxed">
+                  Alle Transaktionen aus dieser Bankdatei wurden erfolgreich abgeglichen, verbucht oder verworfen.
+                </p>
+                <button 
+                  onClick={resetAll}
+                  className="mt-6 px-6 py-3 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest"
+                >
+                  Neuen Kontoauszug einlesen
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

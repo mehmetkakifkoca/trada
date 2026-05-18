@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useAuthStore } from "@/store/auth-store";
-import { useDataStore, Project, ProjectStatus, ProjectCategory } from "@/store/data-store";
+import { useDataStore, Project, ProjectStatus, ProjectCategory, SYSTEM_CATEGORIES } from "@/store/data-store";
 import { 
   Plus, 
   Search, 
@@ -247,7 +247,7 @@ export default function ProjectsPage() {
               <div className="space-y-2 md:col-span-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Kategorien (Mehrfachauswahl)</label>
                 <div className="flex flex-wrap gap-2">
-                  {["Design", "Print", "Signage / Tabela", "Website", "Social Media", "Video", "Photography", "Other"].map(cat => (
+                  {SYSTEM_CATEGORIES.map(cat => (
                     <button
                       key={cat}
                       onClick={() => {

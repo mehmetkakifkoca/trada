@@ -6,6 +6,25 @@ export interface PaymentStatus {
   status: "PAID" | "UNPAID" | "PENDING" | "FUTURE";
 }
 
+export const SYSTEM_CATEGORIES = [
+  "Social Media",
+  "Video & Photography",
+  "Design & Grafik",
+  "Website & IT",
+  "Print & Tabela",
+  "Marketing & Ads",
+  "Software & Tools",
+  "Hardware & Equipment",
+  "Material & Production",
+  "Reisekosten",
+  "Bewirtung",
+  "Freelancer & Dienstleister",
+  "Consulting",
+  "Sonstiges"
+] as const;
+
+export type SystemCategory = string; // Using string to ensure legacy data does not break TS, but UI will map over SYSTEM_CATEGORIES
+
 export interface MonthlyReport {
   id: string;
   month: string; // "YYYY-MM"
@@ -80,6 +99,7 @@ export interface Invoice {
   currency: string;
   language: "German" | "English" | "Turkish";
   taxMode: "Austria" | "Germany" | "EU" | "non-EU";
+  category?: SystemCategory;
   amountNet: number;
   amountVat: number;
   amountGross: number;
@@ -104,7 +124,7 @@ export interface Product {
   defaultPrice: number;
   unit: InvoicePosition["unit"];
   vatRate: number;
-  category: string;
+  category: SystemCategory;
 }
 
 export interface RecurringInvoice {
@@ -153,7 +173,7 @@ export interface InvoiceSettings {
 export interface Expense {
   id: string;
   title: string;
-  category: "Software" | "Marketing" | "Hardware" | "Reisekosten" | "Bewirtung" | "Sonstiges";
+  category: SystemCategory;
   date: string;
   amount: number;
   status: "Erfasst" | "Bezahlt";
@@ -183,7 +203,7 @@ export interface TeamMember {
 }
 
 export type ProjectStatus = "Draft" | "Active" | "Waiting for client" | "Finished" | "Cancelled";
-export type ProjectCategory = "Design" | "Print" | "Signage / Tabela" | "Website" | "Social Media" | "Video" | "Photography" | "Other";
+export type ProjectCategory = SystemCategory;
 
 export interface Project {
   id: string;
@@ -220,7 +240,7 @@ export interface ProjectExpense {
   id: string;
   projectId: string;
   title: string;
-  category: "Material" | "Printing" | "Production" | "Travel" | "Software" | "Freelancer" | "Advertising" | "Other";
+  category: SystemCategory;
   amount: number;
   date: string;
   description: string;
