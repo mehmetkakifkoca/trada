@@ -42,29 +42,31 @@ export default function LoginPage() {
       // 1. Try to find in team database (Primary)
       const teamMember = teamMembers.find(m => 
         m.username.toLowerCase() === inputUsername || 
+        m.username.toLowerCase().split('@')[0] === inputUsername ||
         (m.username === "admin@trada.space" && inputUsername === "akif") // Special case for Akif
       );
 
-      if (teamMember && (teamMember.password === password || password === "admin123")) {
+      // 2. Legacy demo users fallback
+      const matchedDemo = demoUsers.find(u => u.email.toLowerCase() === inputUsername && u.pass === password);
+
+      if (teamMember && (teamMember.password === password || password === "admin123" || !!matchedDemo)) {
         document.cookie = "__session=demo-token; path=/; max-age=3600";
         setUser({
-          id: `demo-${teamMember.id}`,
+          id: teamMember.id === "e7" ? "demo-admin" : `demo-${teamMember.id}`,
           email: teamMember.username.includes("@") ? teamMember.username : `${teamMember.username}@trada.space`,
           role: (teamMember.role as any),
           username: teamMember.username,
           fullName: teamMember.fullName,
           avatarUrl: teamMember.avatarUrl,
           isActive: true,
-          colorTag: teamMember.colorTag || "#000000"
+          colorTag: teamMember.colorTag || "#000000",
+          customPermissions: teamMember.permissions || ["crm", "proj", "cal", "att"]
         });
         toast.success(`Willkommen zurück, ${teamMember.fullName}!`);
         router.push("/dashboard");
         return;
       }
 
-      // 2. Legacy demo users fallback
-      const matchedDemo = demoUsers.find(u => u.email.toLowerCase() === inputUsername && u.pass === password);
-      
       if (matchedDemo) {
         document.cookie = "__session=demo-token; path=/; max-age=3600";
         setUser({
@@ -74,7 +76,8 @@ export default function LoginPage() {
           username: matchedDemo.email,
           fullName: matchedDemo.name,
           isActive: true,
-          colorTag: "#000000"
+          colorTag: "#000000",
+          customPermissions: matchedDemo.role === "Mitarbeiter" ? ["proj", "cal", "att"] : ["acc", "crm", "team", "att", "proj", "cal"]
         });
         toast.success(`Willkommen zurück, ${matchedDemo.name}!`);
         router.push("/dashboard");
@@ -83,14 +86,21 @@ export default function LoginPage() {
 
       // Real Firebase Auth fallback
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      const dbMember = teamMembers.find(m => 
+        m.username.toLowerCase() === email.toLowerCase() || 
+        m.username.toLowerCase().split('@')[0] === email.split('@')[0].toLowerCase()
+      );
+
       setUser({
-        id: userCredential.user.uid,
+        id: dbMember?.id === "e7" ? "demo-admin" : userCredential.user.uid,
         email: userCredential.user.email || "",
-        role: "Mitarbeiter", // Default to Mitarbeiter if role is not found in demo
+        role: (dbMember?.role as any) || "Mitarbeiter",
         username: email.split("@")[0],
-        fullName: email.split("@")[0],
+        fullName: dbMember?.fullName || email.split("@")[0],
         isActive: true,
-        colorTag: "#000000"
+        colorTag: dbMember?.colorTag || "#000000",
+        customPermissions: dbMember?.permissions || ["att", "proj", "cal"]
       });
       toast.success("Willkommen zurück!");
       router.push("/dashboard");

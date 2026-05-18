@@ -15,6 +15,12 @@ const poppins = Poppins({
 export const metadata: Metadata = {
   title: "Trada Media | Dashboard",
   description: "Trada Media Agency Dashboard",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "Trada Space",
+  },
 };
 
 export default function RootLayout({

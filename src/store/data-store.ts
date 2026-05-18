@@ -144,6 +144,8 @@ export interface InvoiceSettings {
   secondaryColor: string;
   tertiaryColor: string;
   firmenbuch: string;
+  backupTime?: string;
+  enableAutoBackup?: boolean;
   companyPhone: string;
   companyEmail: string;
 }
@@ -181,6 +183,7 @@ export interface Project {
   customerId: string;
   customerName: string;
   category: ProjectCategory;
+  categories?: ProjectCategory[];
   description: string;
   status: ProjectStatus;
   revenue: number;
@@ -388,6 +391,29 @@ export interface Notification {
   read: boolean;
 }
 
+export interface FreelancerTag {
+  id: string;
+  freelancerId: string;
+  name: string;
+  hourlyRate: number;
+  color: string;
+}
+
+export interface FreelancerWorkLog {
+  id: string;
+  freelancerId: string;
+  projectId: string;
+  date: string; // YYYY-MM-DD
+  type: "HOURLY" | "PAUSCHAL";
+  startTime?: string; // HH:mm
+  endTime?: string; // HH:mm
+  durationHours?: number;
+  tagId?: string;
+  pauschalAmount?: number;
+  description: string;
+  totalCost: number;
+}
+
 interface DataState {
   customers: Customer[];
   invoices: Invoice[];
@@ -416,6 +442,10 @@ interface DataState {
   adminProjectHours: AdminProjectHour[];
   timeAllocations: TimeAllocation[];
   unassignedWorkTimes: UnassignedWorkTime[];
+  
+  // Freelancer Features
+  freelancerTags: FreelancerTag[];
+  freelancerWorkLogs: FreelancerWorkLog[];
   
   // Actions
   setCustomers: (customers: Customer[]) => void;
@@ -472,6 +502,8 @@ interface DataState {
   deleteTodo: (id: string) => void;
 
   addAttendanceLog: (log: AttendanceLog) => void;
+  updateAttendanceLog: (id: string, updates: Partial<AttendanceLog>) => void;
+  deleteAttendanceLog: (id: string) => void;
   addNotification: (notification: Notification) => void;
   markNotificationAsRead: (id: string) => void;
 
@@ -505,6 +537,15 @@ interface DataState {
   updateTimeAllocation: (id: string, allocation: Partial<TimeAllocation>) => void;
   deleteTimeAllocation: (id: string) => void;
   addUnassignedWorkTime: (time: UnassignedWorkTime) => void;
+
+  // Freelancer Actions
+  addFreelancerTag: (tag: FreelancerTag) => void;
+  updateFreelancerTag: (id: string, tag: Partial<FreelancerTag>) => void;
+  deleteFreelancerTag: (id: string) => void;
+
+  addFreelancerWorkLog: (log: FreelancerWorkLog) => void;
+  updateFreelancerWorkLog: (id: string, log: Partial<FreelancerWorkLog>) => void;
+  deleteFreelancerWorkLog: (id: string) => void;
 }
 
 
@@ -590,7 +631,9 @@ export const useDataStore = create<DataState>()(
         tertiaryColor: "#94A3B8",
         firmenbuch: "FN 123456 x",
         companyPhone: "+49 30 12345678",
-        companyEmail: "info@trada-media.de"
+        companyEmail: "info@trada-media.de",
+        backupTime: "00:00",
+        enableAutoBackup: true
       },
       expenses: [
         { id: "ex1", title: "Adobe Creative Cloud", category: "Software", date: "2023-10-10", amount: 59.90, status: "Bezahlt" },
@@ -599,11 +642,11 @@ export const useDataStore = create<DataState>()(
         { id: "ex4", title: "Marketing Campaign A", category: "Marketing", date: "2023-10-15", amount: 22850.00, status: "Bezahlt" },
       ],
       teamMembers: [
-        { id: "e1", fullName: "Nisa", username: "nisa", password: "Nisa123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150", colorTag: "#8B5CF6", skills: ["Social Media", "Content"], permissions: ["att"] },
-        { id: "e2", fullName: "Arda Turan", username: "arda", password: "Arda123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=150", colorTag: "#2563EB", skills: ["Ads", "Marketing"], permissions: ["att"] },
-        { id: "e3", fullName: "Emre Kuvvet", username: "emre", password: "Emre123", role: "Co Founder", avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150", colorTag: "#10B981", skills: ["Strategy", "Management"], permissions: ["att"] },
-        { id: "e4", fullName: "Yalcin Okur", username: "yalcin", password: "Yalcin123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&q=80&w=150", colorTag: "#F97316", skills: ["Sales", "CRM"], permissions: ["att"] },
-        { id: "e5", fullName: "Steffanie Floimayer", username: "steffie", password: "Steffie123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150", colorTag: "#EC4899", skills: ["Design", "Creative"], permissions: ["att"] },
+        { id: "e1", fullName: "Nisa", username: "nisa", password: "Nisa123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&q=80&w=150", colorTag: "#8B5CF6", skills: ["Social Media", "Content"], permissions: ["att", "proj", "cal"] },
+        { id: "e2", fullName: "Arda Turan", username: "arda", password: "Arda123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1599566150163-29194dcaad36?auto=format&fit=crop&q=80&w=150", colorTag: "#2563EB", skills: ["Ads", "Marketing"], permissions: ["att", "proj", "cal"] },
+        { id: "e3", fullName: "Emre Kuvvet", username: "emre", password: "Emre123", role: "Co Founder", avatarUrl: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&q=80&w=150", colorTag: "#10B981", skills: ["Strategy", "Management"], permissions: ["att", "proj", "cal"] },
+        { id: "e4", fullName: "Yalcin Okur", username: "yalcin", password: "Yalcin123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1527980965255-d3b416303d12?auto=format&fit=crop&q=80&w=150", colorTag: "#F97316", skills: ["Sales", "CRM"], permissions: ["att", "proj", "cal"] },
+        { id: "e5", fullName: "Steffanie Floimayer", username: "steffie", password: "Steffie123", role: "Mitarbeiter", avatarUrl: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150", colorTag: "#EC4899", skills: ["Design", "Creative"], permissions: ["att", "proj", "cal"] },
 
         { id: "e7", fullName: "Mehmet Akif Koca", username: "akif", password: "Akif123", role: "CEO", avatarUrl: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&q=80&w=150", colorTag: "#8B5CF6", skills: ["Executive", "Vision"], permissions: ["acc", "crm", "team", "att", "cal", "soc"] },
         { id: "e_super", fullName: "Trada Admin", username: "trada", password: "trada123", role: "SUPERADMIN", colorTag: "#000000", skills: ["System", "Security"], permissions: ["acc", "crm", "team", "att", "cal", "soc"] },
@@ -679,6 +722,8 @@ export const useDataStore = create<DataState>()(
       adminProjectHours: [],
       timeAllocations: [],
       unassignedWorkTimes: [],
+      freelancerTags: [],
+      freelancerWorkLogs: [],
 
       setCustomers: (customers) => set({ customers }),
       addCustomer: (customer) => set((state) => ({ customers: [...state.customers, customer] })),
@@ -866,6 +911,22 @@ export const useDataStore = create<DataState>()(
         timeAllocations: state.timeAllocations.filter(a => a.id !== id)
       })),
       addUnassignedWorkTime: (time) => set((state) => ({ unassignedWorkTimes: [...state.unassignedWorkTimes, time] })),
+
+      addFreelancerTag: (tag) => set((state) => ({ freelancerTags: [...state.freelancerTags, tag] })),
+      updateFreelancerTag: (id, updated) => set((state) => ({
+        freelancerTags: state.freelancerTags.map((t) => t.id === id ? { ...t, ...updated } : t)
+      })),
+      deleteFreelancerTag: (id) => set((state) => ({
+        freelancerTags: state.freelancerTags.filter((t) => t.id !== id)
+      })),
+
+      addFreelancerWorkLog: (log) => set((state) => ({ freelancerWorkLogs: [...state.freelancerWorkLogs, log] })),
+      updateFreelancerWorkLog: (id, updated) => set((state) => ({
+        freelancerWorkLogs: state.freelancerWorkLogs.map((l) => l.id === id ? { ...l, ...updated } : l)
+      })),
+      deleteFreelancerWorkLog: (id) => set((state) => ({
+        freelancerWorkLogs: state.freelancerWorkLogs.filter((l) => l.id !== id)
+      })),
 
     }),
     {

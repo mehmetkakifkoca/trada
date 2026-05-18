@@ -35,6 +35,7 @@ interface CalendarEvent {
   start: { dateTime?: string; date?: string };
   end: { dateTime?: string; date?: string };
   htmlLink: string;
+  calendarId?: string;
   calendarName?: string;
   calendarColor?: string;
 }
@@ -188,7 +189,7 @@ export default function CalendarPage() {
       results.forEach(items => allEvents.push(...items));
       
       const uniqueEvents = Array.from(new Map(allEvents.map(item => [item.id, item])).values())
-        .filter(e => e.start && selectedCalendarIds.includes(e.calendarId)); // Extra safety filter
+        .filter(e => e.start && selectedCalendarIds.includes(e.calendarId || "")); // Extra safety filter
 
       setEvents(uniqueEvents);
       syncEventsToTodos(uniqueEvents); // Auto-sync tasks from titles

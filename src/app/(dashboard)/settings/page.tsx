@@ -21,6 +21,7 @@ import { useDataStore } from "@/store/data-store";
 import { useAuthStore } from "@/store/auth-store";
 import { toast } from "sonner";
 import { auth } from "@/lib/firebase";
+import { Download, Upload } from "lucide-react";
 
 export default function SettingsPage() {
   const { invoiceSettings, updateInvoiceSettings, teamMembers, updateTeamMember } = useDataStore();
@@ -110,6 +111,83 @@ export default function SettingsPage() {
         toast.info("Vorschau geladen. Speichern nicht vergessen.");
       };
       reader.readAsDataURL(file);
+    }
+  };
+
+  const handleExportBackup = () => {
+    try {
+      const data = localStorage.getItem("trada-data-storage");
+      if (!data) {
+        toast.error("Keine Daten zum Exportieren gefunden.");
+        return;
+      }
+      const blob = new Blob([data], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `tradaspace-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      toast.success("Backup erfolgreich exportiert!");
+    } catch (err) {
+      toast.error("Fehler beim Exportieren des Backups.");
+    }
+  };
+
+  const handleImportBackup = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const content = event.target?.result as string;
+        // Verify it's valid JSON
+        JSON.parse(content);
+        
+        if (confirm("WARNUNG: Dies überschreibt die gesamte aktuelle Datenbank! Möchten Sie wirklich fortfahren?")) {
+          localStorage.setItem("trada-data-storage", content);
+          toast.success("Backup erfolgreich wiederhergestellt! Lade neu...");
+          setTimeout(() => {
+            window.location.reload();
+          }, 1000);
+        }
+      } catch (err) {
+        toast.error("Ungültige Backup-Datei.");
+      }
+    };
+    reader.readAsText(file);
+    e.target.value = "";
+  };
+
+  const [isGdriveBackingUp, setIsGdriveBackingUp] = useState(false);
+
+  const handleGDriveBackup = async () => {
+    setIsGdriveBackingUp(true);
+    try {
+      const data = localStorage.getItem("trada-data-storage");
+      if (!data) {
+        toast.error("Keine Daten zum Sichern gefunden.");
+        return;
+      }
+      const response = await fetch(`/api/backup?userId=${user?.id}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: JSON.parse(data) }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        toast.success(`Backup erfolgreich auf Google Drive gespeichert! (${result.fileName})`);
+        localStorage.setItem("last-gdrive-backup", new Date().toISOString().split("T")[0]);
+      } else {
+        toast.error(`Fehler: ${result.error || "Backup fehlgeschlagen"}`);
+      }
+    } catch (err) {
+      toast.error("Verbindung zum Backup-Server fehlgeschlagen.");
+    } finally {
+      setIsGdriveBackingUp(false);
     }
   };
 
@@ -283,6 +361,77 @@ export default function SettingsPage() {
                       className="w-full px-5 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-black/5 min-h-[100px]"
                     />
                   </div>
+                </div>
+              </section>
+
+              {/* Backup & Restore */}
+              <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-10 space-y-8">
+                <div className="flex items-center gap-3 mb-2">
+                   <Save className="h-5 w-5 text-gray-400" />
+                   <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Datenbank Backup</h3>
+                </div>
+                <p className="text-sm text-gray-500">Da die Daten aktuell lokal gespeichert werden, sollten Sie regelmäßig ein Backup herunterladen, um Datenverlust zu vermeiden.</p>
+                
+                {/* Auto-Backup Configurations */}
+                <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h4 className="text-sm font-black text-gray-900">Tägliches Google Drive Auto-Backup</h4>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">Sichert Ihre Datenbank automatisch in Ihr Google Drive.</p>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={invoiceSettings.enableAutoBackup ?? true} 
+                        onChange={(e) => {
+                          updateInvoiceSettings({ enableAutoBackup: e.target.checked });
+                          toast.success(e.target.checked ? "Auto-Backup aktiviert" : "Auto-Backup deaktiviert");
+                        }} 
+                        className="sr-only peer" 
+                      />
+                      <div className="w-14 h-8 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[4px] after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-black"></div>
+                    </label>
+                  </div>
+
+                  {(invoiceSettings.enableAutoBackup ?? true) && (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-4 border-t border-gray-200/50 animate-in fade-in duration-300">
+                      <div>
+                        <h4 className="text-sm font-black text-gray-900">Backup-Uhrzeit</h4>
+                        <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide mt-1">Legen Sie fest, zu welcher Uhrzeit das tägliche Backup durchgeführt werden soll.</p>
+                      </div>
+                      <input 
+                        type="time" 
+                        value={invoiceSettings.backupTime || "00:00"} 
+                        onChange={(e) => {
+                          updateInvoiceSettings({ backupTime: e.target.value });
+                          toast.success(`Backup-Uhrzeit auf ${e.target.value} festgelegt`);
+                        }} 
+                        className="px-6 py-3 bg-white border border-gray-100 rounded-2xl text-sm font-black outline-none focus:ring-2 focus:ring-black min-w-[150px] text-center" 
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <button 
+                    onClick={handleExportBackup}
+                    className="flex items-center justify-center gap-2 py-4 bg-black text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-[1.02] transition-all"
+                  >
+                    <Download className="h-4 w-4" /> PC Exportieren
+                  </button>
+                  
+                  <label className="flex items-center justify-center gap-2 py-4 bg-gray-50 text-gray-900 border border-gray-200 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 cursor-pointer transition-all">
+                    <Upload className="h-4 w-4" /> PC Importieren
+                    <input type="file" accept=".json" className="hidden" onChange={handleImportBackup} />
+                  </label>
+
+                  <button 
+                    onClick={handleGDriveBackup}
+                    disabled={isGdriveBackingUp}
+                    className="flex items-center justify-center gap-2 py-4 bg-blue-50 text-blue-600 border border-blue-100 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-blue-100 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100 transition-all"
+                  >
+                    <UploadCloud className="h-4 w-4" /> {isGdriveBackingUp ? "Sichern..." : "Google Drive"}
+                  </button>
                 </div>
               </section>
             </div>

@@ -62,8 +62,8 @@ export default function CRMPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.email) {
-      toast.error("Bitte füllen Sie alle Pflichtfelder aus.");
+    if (!formData.name) {
+      toast.error("Der Kundenname ist ein Pflichtfeld.");
       return;
     }
 
@@ -214,10 +214,9 @@ export default function CRMPage() {
                    />
                 </div>
                 <div className="space-y-2">
-                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">E-Mail Adresse *</label>
+                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">E-Mail Adresse</label>
                    <input 
                     type="email" 
-                    required
                     className="w-full px-4 py-3 bg-gray-50 rounded-xl text-sm focus:ring-2 focus:ring-black/5 outline-none"
                     value={formData.email}
                     onChange={(e) => setFormData({...formData, email: e.target.value})}

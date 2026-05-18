@@ -17,6 +17,7 @@ export async function GET(request: Request) {
     scope: [
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events',
+      'https://www.googleapis.com/auth/drive.file',
     ].join(' '),
   };
 

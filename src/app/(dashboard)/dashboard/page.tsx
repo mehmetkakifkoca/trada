@@ -228,7 +228,7 @@ export default function DashboardPage() {
   const { 
     attendanceLogs = [], 
     teamMembers = [], 
-    invoiceSettings = {},
+    invoiceSettings,
     projects = [], 
     projectTasks = [], 
     addTimeAllocation, 

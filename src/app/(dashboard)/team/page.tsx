@@ -339,6 +339,7 @@ function EditModal({ member, formData, setFormData, onSave, onClose, isSuper, ha
               <option value="Manager">Manager</option>
               <option value="Buchhaltung">Buchhaltung</option>
               <option value="Mitarbeiter">Mitarbeiter</option>
+              <option value="Freelancer">Freelancer</option>
             </select>
           </div>
 
@@ -427,7 +428,9 @@ function EditModal({ member, formData, setFormData, onSave, onClose, isSuper, ha
                 { id: 'crm', label: 'CRM / Kunden' },
                 { id: 'team', label: 'Team Admin' },
                 { id: 'proj', label: 'Projekte' },
-                { id: 'att', label: 'Attendance' }
+                { id: 'att', label: 'Attendance' },
+                { id: 'cal', label: 'Kalender' },
+                { id: 'free', label: 'Freelancer' }
               ].map(perm => (
                 <button
                   key={perm.id}

@@ -16,7 +16,8 @@ import {
   Layers,
   HelpCircle,
   LogOut,
-  X
+  X,
+  Briefcase
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useState } from "react";
@@ -53,25 +54,26 @@ export function Sidebar() {
     { label: "Zeiterfassung", href: "/attendance", icon: Clock, roles: ["CEO", "Co Founder", "Manager", "Mitarbeiter"], permission: "att" },
     { label: "Projekte", href: "/projects", icon: Layers, roles: ["CEO", "Co Founder", "Manager", "Mitarbeiter"], permission: "proj" },
     { label: "Kalender", href: "/calendar", icon: Calendar, roles: ["CEO", "Co Founder", "Manager", "Mitarbeiter"], permission: "cal" },
+    { label: "Freelancer", href: "/freelancers", icon: Briefcase, roles: ["CEO", "Co Founder", "Manager", "Freelancer"], permission: "free" },
     { label: "Einstellungen", href: "/settings", icon: Settings, roles: ["CEO", "Co Founder"] },
   ];
 
-  const isSuperAdmin = user?.role?.toLowerCase() === "superadmin";
+  const isSuperAdmin = user?.role?.toLowerCase() === "superadmin" || user?.role?.toLowerCase() === "ceo";
   
   const allowedNavItems = navItems.filter((item) => {
     if (!user) return false;
     if (isSuperAdmin) return true;
 
+    // If the module has a specific permission requirement, it's the ultimate source of truth
+    if (item.permission) {
+      return user.customPermissions?.includes(item.permission) ?? false;
+    }
+
+    // If no specific permission is required (like Dashboard), check base role
     const userRole = user.role?.toLowerCase() || "";
     const itemRoles = item.roles.map(r => r.toLowerCase());
     
-    if (!itemRoles.includes(userRole)) return false;
-    
-    if (item.permission && user.customPermissions) {
-      return user.customPermissions.includes(item.permission);
-    }
-    
-    return true;
+    return itemRoles.includes(userRole);
   });
 
   if (allowedNavItems.length === 0) return null;

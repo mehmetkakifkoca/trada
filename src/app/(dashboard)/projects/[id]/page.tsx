@@ -32,7 +32,8 @@ import {
   ArrowRight,
   TrendingDown,
   Info,
-  Building2
+  Building2,
+  Briefcase
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -43,7 +44,7 @@ export default function ProjectDetailPage() {
   const router = useRouter();
   const { user } = useAuthStore();
   const { 
-    projects, projectTasks, projectExpenses, adminProjectHours, timeAllocations, teamMembers, customers,
+    projects, projectTasks, projectExpenses, adminProjectHours, timeAllocations, teamMembers, customers, freelancerWorkLogs,
     updateProject, deleteProject, addProjectTask, updateProjectTask, deleteProjectTask,
     addProjectExpense, updateProjectExpense, deleteProjectExpense,
     addAdminProjectHour, deleteAdminProjectHour, updateTimeAllocation, deleteTimeAllocation
@@ -61,6 +62,7 @@ export default function ProjectDetailPage() {
       employeeLaborCost: 0,
       adminLaborCost: 0,
       totalManualExpenses: 0,
+      freelancerCost: 0,
       totalCost: 0,
       profit: 0,
       margin: 0,
@@ -72,6 +74,7 @@ export default function ProjectDetailPage() {
     const allocations = timeAllocations.filter(a => a.projectId === project.id);
     const expenses = projectExpenses.filter(e => e.projectId === project.id);
     const adminHours = adminProjectHours.filter(h => h.projectId === project.id);
+    const freelancerLogs = freelancerWorkLogs.filter(l => l.projectId === project.id);
 
     let employeeLaborCost = 0;
     allocations.forEach(a => {
@@ -82,8 +85,9 @@ export default function ProjectDetailPage() {
 
     const adminLaborCost = adminHours.reduce((sum, h) => sum + (h.hours * h.hourlyCost), 0);
     const totalManualExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+    const freelancerCost = freelancerLogs.reduce((sum, l) => sum + (l.totalCost || 0), 0);
     
-    const totalCost = employeeLaborCost + adminLaborCost + totalManualExpenses;
+    const totalCost = employeeLaborCost + adminLaborCost + totalManualExpenses + freelancerCost;
     const profit = project.revenue - totalCost;
     const margin = project.revenue > 0 ? (profit / project.revenue) * 100 : 0;
     const totalHours = allocations.reduce((sum, a) => sum + a.hours, 0) + adminHours.reduce((sum, h) => sum + h.hours, 0);
@@ -92,6 +96,7 @@ export default function ProjectDetailPage() {
       employeeLaborCost,
       adminLaborCost,
       totalManualExpenses,
+      freelancerCost,
       totalCost,
       profit,
       margin,
@@ -99,7 +104,7 @@ export default function ProjectDetailPage() {
       allocationCount: allocations.length,
       expenseCount: expenses.length
     };
-  }, [project, timeAllocations, projectExpenses, adminProjectHours, teamMembers]);
+  }, [project, timeAllocations, projectExpenses, adminProjectHours, teamMembers, freelancerWorkLogs]);
 
   if (!project) return <div className="p-20 text-center font-black text-gray-300">Projekt nicht gefunden.</div>;
 
@@ -139,8 +144,10 @@ export default function ProjectDetailPage() {
       {/* Main Header */}
       <div className="bg-white rounded-[48px] border border-gray-100 shadow-sm p-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-10">
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-             <span className="px-3 py-1 bg-brand-secondary/10 text-brand-secondary text-[10px] font-black uppercase tracking-widest rounded-full">{project.category}</span>
+          <div className="flex flex-wrap items-center gap-3">
+             {(project.categories || [project.category]).map(cat => (
+               <span key={cat} className="px-3 py-1 bg-brand-secondary/10 text-brand-secondary text-[10px] font-black uppercase tracking-widest rounded-full">{cat}</span>
+             ))}
              <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">ID: {project.id}</span>
           </div>
           <h1 className="text-5xl font-black text-gray-900 tracking-tight leading-[0.9]">{project.name}</h1>
@@ -811,6 +818,13 @@ function FinancialsTab({ project, financials }: any) {
                    <span className="text-sm font-bold text-gray-500">Material & Spesen</span>
                 </div>
                 <span className="font-black text-gray-900">€{financials.totalManualExpenses.toLocaleString()}</span>
+             </div>
+             <div className="flex justify-between items-center">
+                <div className="flex items-center gap-3">
+                   <div className="h-8 w-8 rounded-full bg-teal-50 text-teal-500 flex items-center justify-center"><Briefcase className="h-4 w-4" /></div>
+                   <span className="text-sm font-bold text-gray-500">Freelancer</span>
+                </div>
+                <span className="font-black text-gray-900">€{financials.freelancerCost.toLocaleString()}</span>
              </div>
              <div className="pt-6 border-t border-gray-100 flex justify-between items-center">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Gesamtkosten</span>

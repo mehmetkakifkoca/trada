@@ -42,7 +42,7 @@ import { format, addDays } from "date-fns";
 const UNITS = ["hour", "piece", "day", "month", "project", "package"] as const;
 const LANGUAGES = ["German", "English", "Turkish"] as const;
 const TAX_MODES = ["Austria", "Germany", "EU", "non-EU"] as const;
-const INVOICE_TYPES: InvoiceType[] = [
+const INVOICE_TYPES: any[] = [
   "Standardrechnung", "Wiederkehrende Rechnung", "Teilrechnung", 
   "Schlussrechnung", "Abschlagsrechnung", "Proforma-Rechnung", 
   "Gutschrift", "Stornorechnung"
@@ -72,7 +72,7 @@ export default function InvoiceEditorPage() {
   // Editor State
   const [invoice, setInvoice] = useState<Partial<Invoice>>({
     id: "",
-    type: "Standardrechnung",
+    type: "Standardrechnung" as any,
     date: format(new Date(), "yyyy-MM-dd"),
     dueDate: format(addDays(new Date(), 14), "yyyy-MM-dd"),
     currency: "EUR",

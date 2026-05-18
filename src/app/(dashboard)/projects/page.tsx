@@ -27,7 +27,7 @@ export default function ProjectsPage() {
   const { user } = useAuthStore();
   const { 
     projects, addProject, customers, teamMembers,
-    projectTasks, timeAllocations
+    projectTasks, timeAllocations, freelancerWorkLogs
   } = useDataStore();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -41,6 +41,7 @@ export default function ProjectsPage() {
     name: "",
     customerId: "",
     category: "Design",
+    categories: ["Design"],
     status: "Active",
     revenue: 0,
     startDate: new Date().toISOString().split('T')[0],
@@ -56,8 +57,10 @@ export default function ProjectsPage() {
                           p.internalCode?.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStatus = statusFilter === "All" || p.status === statusFilter;
       
-      // If employee, only show projects they are assigned to
-      const isAssigned = isCEO || projectTasks.some(t => t.projectId === p.id && t.assignedMemberIds.includes(user?.id || ""));
+      // If employee has explicit 'proj' permission or is CEO, they see all projects.
+      // Otherwise, fallback to seeing only projects where they have assigned tasks.
+      const hasProjPermission = user?.customPermissions?.includes("proj");
+      const isAssigned = isCEO || hasProjPermission || projectTasks.some(t => t.projectId === p.id && t.assignedMemberIds.includes(user?.id || ""));
       
       return matchesSearch && matchesStatus && isAssigned;
     });
@@ -85,6 +88,7 @@ export default function ProjectsPage() {
       name: "",
       customerId: "",
       category: "Design",
+      categories: ["Design"],
       status: "Active",
       revenue: 0,
       startDate: new Date().toISOString().split('T')[0],
@@ -141,7 +145,7 @@ export default function ProjectsPage() {
       {/* Project Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {displayProjects.map((project) => {
-          const stats = calculateProjectQuickStats(project, projectTasks, timeAllocations, teamMembers);
+          const stats = calculateProjectQuickStats(project, projectTasks, timeAllocations, teamMembers, freelancerWorkLogs);
           return (
             <Link 
               key={project.id}
@@ -150,7 +154,7 @@ export default function ProjectsPage() {
             >
               <div className="flex justify-between items-start">
                 <div className="space-y-1">
-                   <p className="text-[10px] font-black text-brand-secondary uppercase tracking-[0.2em]">{project.category}</p>
+                   <p className="text-[10px] font-black text-brand-secondary uppercase tracking-[0.2em]">{project.categories?.join(", ") || project.category}</p>
                    <h3 className="text-xl font-black text-gray-900 leading-tight group-hover:text-brand-secondary transition-colors">{project.name}</h3>
                    <p className="text-xs font-bold text-gray-400">{project.customerName}</p>
                 </div>
@@ -240,22 +244,25 @@ export default function ProjectsPage() {
                   {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Kategorie</label>
-                <select 
-                  className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none focus:ring-4 focus:ring-black/5 appearance-none"
-                  value={formData.category}
-                  onChange={(e) => setFormData({...formData, category: e.target.value as any})}
-                >
-                  <option value="Design">Design</option>
-                  <option value="Print">Print</option>
-                  <option value="Beschilderung">Beschilderung</option>
-                  <option value="Website">Website</option>
-                  <option value="Social Media">Social Media</option>
-                  <option value="Video">Video</option>
-                  <option value="Photography">Photography</option>
-                  <option value="Other">Andere</option>
-                </select>
+              <div className="space-y-2 md:col-span-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Kategorien (Mehrfachauswahl)</label>
+                <div className="flex flex-wrap gap-2">
+                  {["Design", "Print", "Signage / Tabela", "Website", "Social Media", "Video", "Photography", "Other"].map(cat => (
+                    <button
+                      key={cat}
+                      onClick={() => {
+                        const current = formData.categories || [];
+                        const next = current.includes(cat as any) ? current.filter(c => c !== cat) : [...current, cat as any];
+                        setFormData({...formData, categories: next, category: (next[0] || "Design") as any});
+                      }}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all ${
+                        formData.categories?.includes(cat as any) ? "bg-black text-white border-black" : "bg-gray-50 text-gray-400 border-gray-100 hover:bg-gray-100"
+                      }`}
+                    >
+                      {cat}
+                    </button>
+                  ))}
+                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Budget / Umsatz (€)</label>
@@ -325,12 +332,10 @@ function StatusBadge({ status }: { status: ProjectStatus }) {
   );
 }
 
-function calculateProjectQuickStats(project: Project, tasks: any[], allocations: any[], teamMembers: any[]) {
+function calculateProjectQuickStats(project: Project, tasks: any[], allocations: any[], teamMembers: any[], freelancerWorkLogs: any[]) {
   const projectAllocations = allocations.filter(a => a.projectId === project.id);
   const totalHours = projectAllocations.reduce((sum, a) => sum + a.hours, 0);
   
-  // Basic profit calc: Revenue - (Hours * 20) as placeholder
-  // Real one will use employee hourly costs
   let laborCost = 0;
   const involvedMemberIds = new Set<string>();
 
@@ -340,12 +345,15 @@ function calculateProjectQuickStats(project: Project, tasks: any[], allocations:
     const hourlyCost = (member?.hourlyCost || 20) * (member?.costMultiplier || 1);
     laborCost += a.hours * hourlyCost;
   });
+  
+  const projectFreelancerLogs = freelancerWorkLogs.filter(l => l.projectId === project.id);
+  const freelancerCost = projectFreelancerLogs.reduce((sum, l) => sum + (l.totalCost || 0), 0);
 
   const involvedMembers = teamMembers.filter(m => involvedMemberIds.has(m.id));
 
   return {
     totalHours,
-    profit: project.revenue - laborCost,
+    profit: project.revenue - laborCost - freelancerCost,
     involvedMembers
   };
 }
