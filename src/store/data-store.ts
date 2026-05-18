@@ -157,6 +157,14 @@ export interface Expense {
   date: string;
   amount: number;
   status: "Erfasst" | "Bezahlt";
+  projectId?: string;
+  projectName?: string;
+  customerId?: string;
+  customerName?: string;
+  fileUrl?: string;
+  fileName?: string;
+  fileSize?: string;
+  fileType?: string;
 }
 
 export interface TeamMember {
