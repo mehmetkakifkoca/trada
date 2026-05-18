@@ -33,7 +33,8 @@ import {
   TrendingDown,
   Info,
   Building2,
-  Briefcase
+  Briefcase,
+  Paperclip
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -457,9 +458,17 @@ function TasksTab({ project, isCEO }: any) {
 }
 
 function ExpensesTab({ project, isCEO }: any) {
-  const { projectExpenses, addProjectExpense, deleteProjectExpense } = useDataStore();
+  const { 
+    projectExpenses, 
+    addProjectExpense, 
+    deleteProjectExpense,
+    expenses: generalExpenses,
+    updateExpense
+  } = useDataStore();
+  
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const expenses = projectExpenses.filter(e => e.projectId === project.id);
+  const [selectedGeneralId, setSelectedGeneralId] = useState("");
 
   const [newExpense, setNewExpense] = useState<Partial<ProjectExpense>>({
     title: "",
@@ -467,18 +476,40 @@ function ExpensesTab({ project, isCEO }: any) {
     amount: 0,
     date: new Date().toISOString().split('T')[0],
     description: "",
-    status: "Unpaid"
+    status: "Unpaid",
+    receiptUrl: ""
   });
+
+  const mapCategory = (cat: string): ProjectExpense["category"] => {
+    switch(cat) {
+      case "Software": return "Software";
+      case "Marketing": return "Advertising";
+      case "Reisekosten": return "Travel";
+      case "Hardware": return "Material";
+      default: return "Other";
+    }
+  };
 
   const handleCreateExpense = () => {
     if (!newExpense.title || !newExpense.amount) return;
+    
     addProjectExpense({
       ...newExpense as ProjectExpense,
       id: "EXP-" + Math.random().toString(36).substr(2, 5).toUpperCase(),
       projectId: project.id
     });
+
+    if (selectedGeneralId) {
+      updateExpense(selectedGeneralId, {
+        projectId: project.id,
+        projectName: project.name
+      });
+      toast.success("Allgemeine Ausgabe erfolgreich verknüpft!");
+    }
+
     setIsAddModalOpen(false);
-    setNewExpense({ title: "", category: "Material", amount: 0, date: new Date().toISOString().split('T')[0], status: "Unpaid" });
+    setNewExpense({ title: "", category: "Material", amount: 0, date: new Date().toISOString().split('T')[0], status: "Unpaid", receiptUrl: "" });
+    setSelectedGeneralId("");
   };
 
   return (
@@ -509,7 +540,20 @@ function ExpensesTab({ project, isCEO }: any) {
            <tbody className="divide-y divide-gray-50">
               {expenses.map(exp => (
                 <tr key={exp.id} className="hover:bg-gray-50/50 transition-colors">
-                   <td className="px-8 py-6 font-black text-gray-900">{exp.title}</td>
+                   <td className="px-8 py-6 font-black text-gray-900 flex items-center gap-2">
+                     <span>{exp.title}</span>
+                     {exp.receiptUrl && (
+                       <a 
+                         href={exp.receiptUrl} 
+                         target="_blank" 
+                         rel="noreferrer"
+                         className="p-1 bg-gray-50 text-gray-400 hover:text-black rounded-lg transition-all border border-gray-100 flex items-center justify-center shrink-0"
+                         title="Beleg anzeigen"
+                       >
+                         <Paperclip className="h-3.5 w-3.5" />
+                       </a>
+                     )}
+                   </td>
                    <td className="px-8 py-6">
                       <span className="px-3 py-1 bg-gray-100 text-gray-500 text-[9px] font-black uppercase tracking-widest rounded-full">{exp.category}</span>
                    </td>
@@ -536,6 +580,43 @@ function ExpensesTab({ project, isCEO }: any) {
            <div className="bg-white w-full max-w-lg rounded-[40px] shadow-2xl p-10 space-y-6">
               <h3 className="text-2xl font-black text-gray-900">Neue Ausgabe</h3>
               <div className="space-y-4">
+                 {/* Existing receipt selector */}
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Aus bestehenden Belegen / Rechnungen wählen</label>
+                    <select 
+                      className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none appearance-none font-bold text-gray-800"
+                      value={selectedGeneralId}
+                      onChange={(e) => {
+                        const selId = e.target.value;
+                        setSelectedGeneralId(selId);
+                        if (!selId) return;
+                        
+                        const selectedGe = generalExpenses.find(g => g.id === selId);
+                        if (selectedGe) {
+                          setNewExpense({
+                            title: selectedGe.title,
+                            category: mapCategory(selectedGe.category),
+                            amount: selectedGe.amount,
+                            date: selectedGe.date,
+                            receiptUrl: selectedGe.fileUrl || "",
+                            description: `Ausgabe verknüpft mit Beleg: ${selectedGe.title}`,
+                            status: selectedGe.status === "Bezahlt" ? "Paid" : "Unpaid"
+                          });
+                          toast.success("Daten aus allgemeinem Beleg übernommen!");
+                        }
+                      }}
+                    >
+                      <option value="">-- Beleg auswählen --</option>
+                      {generalExpenses.map(ge => (
+                        <option key={ge.id} value={ge.id}>
+                          [{ge.date}] {ge.title} - €{ge.amount.toLocaleString()} {ge.fileUrl ? "📎" : ""}
+                        </option>
+                      ))}
+                    </select>
+                 </div>
+
+                 <div className="h-px bg-gray-100 my-2" />
+
                  <input placeholder="Titel der Ausgabe..." className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none" value={newExpense.title} onChange={(e)=>setNewExpense({...newExpense, title: e.target.value})} />
                  <select className="w-full px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none appearance-none" value={newExpense.category} onChange={(e)=>setNewExpense({...newExpense, category: e.target.value as any})}>
                    <option value="Material">Material</option>
@@ -548,12 +629,21 @@ function ExpensesTab({ project, isCEO }: any) {
                    <option value="Other">Andere</option>
                  </select>
                  <div className="flex gap-4">
-                    <input type="number" placeholder="Betrag (€)" className="flex-1 px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none" value={newExpense.amount} onChange={(e)=>setNewExpense({...newExpense, amount: Number(e.target.value)})} />
-                    <input type="date" className="flex-1 px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none" value={newExpense.date} onChange={(e)=>setNewExpense({...newExpense, date: e.target.value})} />
+                    <input type="number" placeholder="Betrag (€)" className="flex-1 px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none font-bold" value={newExpense.amount || ""} onChange={(e)=>setNewExpense({...newExpense, amount: Number(e.target.value) || 0})} />
+                    <input type="date" className="flex-1 px-6 py-4 bg-gray-50 rounded-2xl text-sm font-bold outline-none font-bold" value={newExpense.date} onChange={(e)=>setNewExpense({...newExpense, date: e.target.value})} />
                  </div>
               </div>
               <div className="flex gap-4 pt-4">
-                 <button onClick={()=>setIsAddModalOpen(false)} className="flex-1 font-black uppercase text-[10px] tracking-widest text-gray-400">Abbrechen</button>
+                 <button 
+                   onClick={() => {
+                     setIsAddModalOpen(false);
+                     setNewExpense({ title: "", category: "Material", amount: 0, date: new Date().toISOString().split('T')[0], status: "Unpaid", receiptUrl: "" });
+                     setSelectedGeneralId("");
+                   }} 
+                   className="flex-1 font-black uppercase text-[10px] tracking-widest text-gray-400"
+                 >
+                   Abbrechen
+                 </button>
                  <button onClick={handleCreateExpense} className="flex-2 py-4 px-10 bg-black text-white rounded-2xl font-black uppercase text-[10px] tracking-widest">Speichern</button>
               </div>
            </div>
