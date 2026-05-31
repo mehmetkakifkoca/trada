@@ -20,7 +20,19 @@ export const SYSTEM_CATEGORIES = [
   "Bewirtung",
   "Freelancer & Dienstleister",
   "Consulting",
-  "Sonstiges"
+  "Sonstiges",
+  "Mitarbeiterkosten",
+  "Büro",
+  "Intern",
+  "Marketing"
+] as const;
+
+export const LEISTUNGS_CATEGORIES = [
+  "Grafik/Druck",
+  "Web Design/SEO",
+  "Online Marketing",
+  "Foto/Video",
+  "Medya Avusturya"
 ] as const;
 
 export type SystemCategory = string; // Using string to ensure legacy data does not break TS, but UI will map over SYSTEM_CATEGORIES
@@ -69,7 +81,7 @@ export type InvoiceType =
   | "Credit note" 
   | "Cancellation invoice";
 
-export type InvoiceStatus = "ENTWURF" | "OFFEN" | "BEZAHLT" | "STORNIERT" | "OVERDUE" | "CREDITED";
+export type InvoiceStatus = "ENTWURF" | "OFFEN" | "BEZAHLT" | "BEZAHLT_BAR" | "BEZAHLT_BANK" | "STORNIERT" | "OVERDUE" | "CREDITED";
 
 export interface InvoicePosition {
   id: string;
@@ -82,6 +94,12 @@ export interface InvoicePosition {
   vatRate: number;
   discountPercent: number;
   type: "item" | "note" | "separator" | "subtotal";
+  
+  category?: string;
+  priceGross?: number;
+  priceType?: "NET" | "GROSS";
+  discountType?: "PERCENT" | "FIXED";
+  discountValue?: number;
 }
 
 export interface Invoice {

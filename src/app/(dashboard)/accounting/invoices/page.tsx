@@ -47,6 +47,8 @@ const statusConfig: Record<InvoiceStatus, { label: string; color: string; bg: st
   ENTWURF: { label: "Entwurf", color: "text-blue-600", bg: "bg-blue-50" },
   OFFEN: { label: "Offen", color: "text-orange-600", bg: "bg-orange-50" },
   BEZAHLT: { label: "Bezahlt", color: "text-emerald-600", bg: "bg-emerald-50" },
+  BEZAHLT_BAR: { label: "Bezahlt (Bar)", color: "text-emerald-600", bg: "bg-emerald-50" },
+  BEZAHLT_BANK: { label: "Bezahlt (Bank)", color: "text-teal-600", bg: "bg-teal-50" },
   OVERDUE: { label: "Überfällig", color: "text-red-600", bg: "bg-red-50" },
   STORNIERT: { label: "Storniert", color: "text-gray-600", bg: "bg-gray-50" },
   CREDITED: { label: "Gutschrift", color: "text-purple-600", bg: "bg-purple-50" },
@@ -94,7 +96,10 @@ export default function InvoicesDashboard() {
         const matchesSearch = 
           inv.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
           inv.customerName.toLowerCase().includes(searchTerm.toLowerCase());
-        const matchesStatus = statusFilter === "ALL" || inv.status === statusFilter;
+        const matchesStatus = 
+          statusFilter === "ALL" || 
+          inv.status === statusFilter ||
+          (statusFilter === "BEZAHLT" && inv.status.startsWith("BEZAHLT"));
         return matchesSearch && matchesStatus;
       })
       .sort((a, b) => {
@@ -253,7 +258,7 @@ export default function InvoicesDashboard() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm animate-in fade-in duration-200">
           <div className="p-4 border-b border-gray-100 space-y-4">
             <div className="flex flex-wrap items-center gap-1.5">
-              {["ALL", "ENTWURF", "OFFEN", "BEZAHLT", "OVERDUE", "STORNIERT"].map(status => (
+              {["ALL", "ENTWURF", "OFFEN", "BEZAHLT", "BEZAHLT_BAR", "BEZAHLT_BANK", "OVERDUE", "STORNIERT"].map(status => (
                 <button
                   key={status}
                   onClick={() => setStatusFilter(status as any)}

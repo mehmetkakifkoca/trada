@@ -9,7 +9,8 @@ import {
   InvoiceType, 
   Customer, 
   Product,
-  SYSTEM_CATEGORIES
+  SYSTEM_CATEGORIES,
+  LEISTUNGS_CATEGORIES
 } from "@/store/data-store";
 import { 
   Plus, 
@@ -117,20 +118,27 @@ export default function InvoiceEditorPage() {
   }, [isNew, existingInvoice, invoiceSettings]);
 
   // Calculations
+  const getPositionNetSubtotal = (pos: InvoicePosition) => {
+    const itemTotal = pos.quantity * pos.priceNet;
+    if (pos.discountType === "FIXED") {
+      return Math.max(0, itemTotal - (pos.discountValue || 0));
+    } else {
+      const discountPercent = pos.discountValue !== undefined ? pos.discountValue : pos.discountPercent;
+      return itemTotal * (1 - (discountPercent || 0) / 100);
+    }
+  };
+
   const totals = useMemo(() => {
     const net = invoice.positions?.reduce((acc, pos) => {
       if (pos.type !== 'item') return acc;
-      const itemTotal = pos.quantity * pos.priceNet;
-      const discount = itemTotal * (pos.discountPercent / 100);
-      return acc + (itemTotal - discount);
+      return acc + getPositionNetSubtotal(pos);
     }, 0) || 0;
 
-    // Simplified VAT calculation (grouped by rate)
+    // VAT calculation
     const vat = invoice.positions?.reduce((acc, pos) => {
       if (pos.type !== 'item') return acc;
-      const itemTotal = pos.quantity * pos.priceNet;
-      const discount = itemTotal * (pos.discountPercent / 100);
-      return acc + ((itemTotal - discount) * (pos.vatRate / 100));
+      const netSub = getPositionNetSubtotal(pos);
+      return acc + (netSub * (pos.vatRate / 100));
     }, 0) || 0;
 
     return { net, vat, gross: net + vat };
@@ -154,9 +162,14 @@ export default function InvoiceEditorPage() {
       quantity: 1,
       unit: "piece",
       priceNet: 0,
-      vatRate: invoiceSettings.defaultVatRate,
+      vatRate: invoiceSettings.defaultVatRate === 19 ? 20 : (invoiceSettings.defaultVatRate || 20),
       discountPercent: 0,
-      type
+      type,
+      category: "",
+      priceGross: 0,
+      priceType: "NET",
+      discountType: "PERCENT",
+      discountValue: 0
     };
     setInvoice(prev => ({
       ...prev,
@@ -345,6 +358,17 @@ export default function InvoiceEditorPage() {
                                           value={pos.description}
                                           onChange={(e) => updatePosition(pos.id, { description: e.target.value })}
                                         />
+                                        <div className="flex items-center gap-1 mt-1 bg-gray-50/50 px-2 py-0.5 rounded-lg w-max border border-gray-100/50">
+                                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Leistung:</span>
+                                          <select 
+                                            className="bg-transparent text-[9px] font-bold text-gray-600 outline-none cursor-pointer hover:text-black appearance-none"
+                                            value={pos.category || ""}
+                                            onChange={(e) => updatePosition(pos.id, { category: e.target.value })}
+                                          >
+                                            <option value="">Keine Leistungskategorie</option>
+                                            {LEISTUNGS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                          </select>
+                                        </div>
                                       </div>
                                       <div className="col-span-3 md:col-span-1">
                                         <input 
@@ -365,16 +389,56 @@ export default function InvoiceEditorPage() {
                                         <input 
                                           type="number" 
                                           className="w-full bg-transparent text-xs text-right outline-none border-b border-transparent focus:border-black/5 pb-0.5 font-bold"
-                                          value={pos.priceNet}
-                                          onChange={(e) => updatePosition(pos.id, { priceNet: parseFloat(e.target.value) || 0 })}
+                                          value={pos.priceType === "GROSS" ? (pos.priceGross !== undefined ? pos.priceGross : (pos.priceNet * (1 + pos.vatRate / 100))) : pos.priceNet}
+                                          onChange={(e) => {
+                                            const val = parseFloat(e.target.value) || 0;
+                                            if (pos.priceType === "GROSS") {
+                                              const calcNet = val / (1 + pos.vatRate / 100);
+                                              updatePosition(pos.id, { priceGross: val, priceNet: calcNet });
+                                            } else {
+                                              const calcGross = val * (1 + pos.vatRate / 100);
+                                              updatePosition(pos.id, { priceNet: val, priceGross: calcGross });
+                                            }
+                                          }}
                                         />
-                                        <div className="flex items-center justify-end gap-0.5">
+                                        <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              const newType = pos.priceType === "GROSS" ? "NET" : "GROSS";
+                                              if (newType === "GROSS") {
+                                                const calcGross = pos.priceNet * (1 + pos.vatRate / 100);
+                                                updatePosition(pos.id, { priceType: newType, priceGross: calcGross });
+                                              } else {
+                                                updatePosition(pos.id, { priceType: newType });
+                                              }
+                                            }}
+                                            className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider transition-all ${
+                                              pos.priceType === "GROSS"
+                                                ? "bg-indigo-50 text-indigo-600 hover:bg-indigo-100"
+                                                : "bg-gray-100 text-gray-500 hover:bg-gray-200"
+                                            }`}
+                                          >
+                                            {pos.priceType === "GROSS" ? "Brutto" : "Netto"}
+                                          </button>
+                                          
                                           <span className="text-[8px] text-gray-400 uppercase font-bold">USt.</span>
                                           <select 
-                                            className="bg-transparent text-[8px] font-bold outline-none"
+                                            className="bg-transparent text-[8px] font-bold outline-none font-black"
                                             value={pos.vatRate}
-                                            onChange={(e) => updatePosition(pos.id, { vatRate: parseInt(e.target.value) })}
+                                            onChange={(e) => {
+                                              const newVat = parseInt(e.target.value);
+                                              if (pos.priceType === "GROSS") {
+                                                const currentGross = pos.priceGross !== undefined ? pos.priceGross : (pos.priceNet * (1 + pos.vatRate / 100));
+                                                const calcNet = currentGross / (1 + newVat / 100);
+                                                updatePosition(pos.id, { vatRate: newVat, priceNet: calcNet });
+                                              } else {
+                                                const calcGross = pos.priceNet * (1 + newVat / 100);
+                                                updatePosition(pos.id, { vatRate: newVat, priceGross: calcGross });
+                                              }
+                                            }}
                                           >
+                                            <option value={20}>20%</option>
                                             <option value={19}>19%</option>
                                             <option value={7}>7%</option>
                                             <option value={0}>0%</option>
@@ -382,20 +446,41 @@ export default function InvoiceEditorPage() {
                                         </div>
                                       </div>
                                       <div className="col-span-3 md:col-span-1">
-                                        <div className="flex items-center gap-0.5 border-b border-transparent focus-within:border-black/5">
+                                        <div className="flex items-center gap-0.5 border-b border-transparent focus-within:border-black/5 justify-end">
                                           <input 
                                             type="number" 
-                                            className="w-full bg-transparent text-xs text-right outline-none pb-0.5 font-medium"
-                                            value={pos.discountPercent}
-                                            onChange={(e) => updatePosition(pos.id, { discountPercent: parseFloat(e.target.value) || 0 })}
+                                            className="w-full bg-transparent text-xs text-right outline-none pb-0.5 font-medium max-w-[30px]"
+                                            value={pos.discountValue !== undefined ? pos.discountValue : pos.discountPercent}
+                                            onChange={(e) => {
+                                              const val = parseFloat(e.target.value) || 0;
+                                              updatePosition(pos.id, { 
+                                                discountValue: val,
+                                                discountPercent: pos.discountType !== "FIXED" ? val : 0 
+                                              });
+                                            }}
                                           />
-                                          <Percent className="h-2.5 w-2.5 text-gray-300 shrink-0" />
+                                          <select
+                                            className="bg-transparent text-[8px] font-bold outline-none cursor-pointer appearance-none text-right font-black"
+                                            value={pos.discountType || "PERCENT"}
+                                            onChange={(e) => {
+                                              const nextType = e.target.value as "PERCENT" | "FIXED";
+                                              const currentVal = pos.discountValue !== undefined ? pos.discountValue : pos.discountPercent;
+                                              updatePosition(pos.id, { 
+                                                discountType: nextType,
+                                                discountValue: currentVal,
+                                                discountPercent: nextType === "PERCENT" ? currentVal : 0
+                                              });
+                                            }}
+                                          >
+                                            <option value="PERCENT">%</option>
+                                            <option value="FIXED">€</option>
+                                          </select>
                                         </div>
-                                        <p className="text-[7px] text-gray-300 text-right mt-0.5 font-bold">RAB.</p>
+                                        <p className="text-[7px] text-gray-300 text-right mt-0.5 font-bold">RABATT</p>
                                       </div>
                                       <div className="col-span-3 md:col-span-2 text-right pt-0.5">
                                         <p className="text-xs font-bold text-gray-900">
-                                          {formatCurrency((pos.quantity * pos.priceNet) * (1 - pos.discountPercent / 100))}
+                                          {formatCurrency(getPositionNetSubtotal(pos))}
                                         </p>
                                       </div>
                                     </>
@@ -552,7 +637,7 @@ export default function InvoiceEditorPage() {
                       onChange={(e) => setInvoice({...invoice, category: e.target.value})}
                      >
                        <option value="">Keine Kategorie</option>
-                       {SYSTEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                       {LEISTUNGS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                      </select>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
@@ -749,7 +834,7 @@ export default function InvoiceEditorPage() {
                             </td>
                             <td className="py-6 text-center text-xs font-medium text-gray-600">{pos.quantity}</td>
                             <td className="py-6 text-right text-xs font-medium text-gray-600">{formatCurrency(pos.priceNet)}</td>
-                            <td className="py-6 text-right text-sm font-bold text-gray-900">{formatCurrency(pos.quantity * pos.priceNet)}</td>
+                            <td className="py-6 text-right text-sm font-bold text-gray-900">{formatCurrency(getPositionNetSubtotal(pos))}</td>
                          </tr>
                       ))}
                    </tbody>

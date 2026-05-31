@@ -158,7 +158,7 @@ export default function AccountingPage() {
                   <div className="flex items-center gap-1.5">
                     <span className="font-bold text-gray-900 text-xs">{inv.id}</span>
                     <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase tracking-wider ${
-                      inv.status === "BEZAHLT" ? "bg-emerald-50 text-emerald-600" :
+                      inv.status.startsWith("BEZAHLT") ? (inv.status === "BEZAHLT_BANK" ? "bg-teal-50 text-teal-600" : "bg-emerald-50 text-emerald-600") :
                       inv.status === "OFFEN" ? "bg-orange-50 text-orange-600" :
                       inv.status === "OVERDUE" ? "bg-red-50 text-red-600" : "bg-gray-50 text-gray-500"
                     }`}>
