@@ -246,102 +246,101 @@ export default function InvoiceEditorPage() {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency || 'EUR' }).format(val);
   };
-
   return (
-    <div className="space-y-8 pb-20">
+    <div className="space-y-6 pb-12">
       {/* Top Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-4 rounded-3xl border border-gray-100 shadow-sm sticky top-0 z-40">
-        <div className="flex items-center gap-4">
-          <button onClick={() => router.back()} className="h-10 w-10 flex items-center justify-center bg-gray-50 rounded-xl hover:bg-gray-100 transition-all">
-            <ArrowLeft className="h-5 w-5 text-gray-500" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <button onClick={() => router.back()} className="h-8 w-8 flex items-center justify-center bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">
+            <ArrowLeft className="h-4 w-4 text-gray-500" />
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{isNew ? "Neue Rechnung" : `Bearbeite ${invoice.id}`}</h1>
-            <div className="flex items-center gap-2">
-               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{invoice.type}</p>
+            <h1 className="text-sm font-bold text-gray-900 leading-tight">{isNew ? "Neue Rechnung" : `Bearbeite ${invoice.id}`}</h1>
+            <div className="flex items-center gap-1.5 mt-0.5">
+               <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{invoice.type}</p>
                <span className="h-1 w-1 bg-gray-200 rounded-full" />
-               <span className={`text-[9px] font-bold uppercase tracking-widest ${invoice.status === 'BEZAHLT' ? 'text-emerald-500' : 'text-orange-500'}`}>{invoice.status}</span>
+               <span className={`text-[8px] font-bold uppercase tracking-widest ${invoice.status === 'BEZAHLT' ? 'text-emerald-500' : 'text-orange-500'}`}>{invoice.status}</span>
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button 
             onClick={() => setIsPreviewOpen(true)}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gray-50 text-gray-600 rounded-2xl text-xs font-bold hover:bg-gray-100 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-100 transition-all"
           >
-            <Eye className="h-4 w-4" /> Vorschau
+            <Eye className="h-3.5 w-3.5" /> Vorschau
           </button>
           <button 
             onClick={handleSave}
-            className="flex items-center gap-2 px-6 py-3 bg-black text-white rounded-2xl text-sm font-bold hover:bg-gray-800 transition-all shadow-lg shadow-black/10"
+            className="flex items-center gap-1.5 px-4 py-2 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition-all shadow-md"
           >
-            <Save className="h-5 w-5" /> {isNew ? "Speichern" : "Aktualisieren"}
+            <Save className="h-3.5 w-3.5" /> {isNew ? "Speichern" : "Aktualisieren"}
           </button>
         </div>
       </div>
 
       {/* Internal Tabs */}
-      <div className="flex items-center gap-8 border-b border-gray-100 px-4 overflow-x-auto whitespace-nowrap hide-scrollbar">
-        <button onClick={() => setActiveTab("data")} className={`pb-4 text-xs font-bold transition-all border-b-2 ${activeTab === "data" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Rechnungsdaten</button>
+      <div className="flex items-center gap-4 border-b border-gray-100 px-1 overflow-x-auto whitespace-nowrap hide-scrollbar">
+        <button onClick={() => setActiveTab("data")} className={`pb-2.5 text-xs font-bold transition-all border-b-2 ${activeTab === "data" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Rechnungsdaten</button>
         {!isNew && (
           <>
-            <button onClick={() => setActiveTab("payments")} className={`pb-4 text-xs font-bold transition-all border-b-2 ${activeTab === "payments" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Zahlungen</button>
-            <button onClick={() => setActiveTab("history")} className={`pb-4 text-xs font-bold transition-all border-b-2 ${activeTab === "history" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Historie</button>
+            <button onClick={() => setActiveTab("payments")} className={`pb-2.5 text-xs font-bold transition-all border-b-2 ${activeTab === "payments" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Zahlungen</button>
+            <button onClick={() => setActiveTab("history")} className={`pb-2.5 text-xs font-bold transition-all border-b-2 ${activeTab === "history" ? "text-black border-black" : "text-gray-400 border-transparent hover:text-gray-600"}`}>Historie</button>
           </>
         )}
       </div>
 
       {activeTab === "data" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
           {/* Left Side: Main Editor */}
-          <div className="lg:col-span-2 space-y-8">
+          <div className="lg:col-span-2 space-y-6">
             
             {/* Section: Items Table */}
-            <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm overflow-hidden">
-              <div className="p-4 sm:p-8 border-b border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Package className="h-5 w-5 text-gray-400" /> Positionen
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="p-3 sm:p-4 border-b border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <h2 className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <Package className="h-4 w-4 text-gray-400" /> Positionen
                 </h2>
-                <div className="flex flex-wrap items-center gap-2">
-                   <button onClick={() => setIsProductModalOpen(true)} className="flex items-center gap-2 px-3 py-1.5 bg-gray-900 text-white text-[10px] font-bold rounded-lg hover:bg-gray-800 transition-all uppercase tracking-wider">
-                      <Search className="h-3 w-3" /> Produkt-Datenbank
+                <div className="flex flex-wrap items-center gap-1.5">
+                   <button onClick={() => setIsProductModalOpen(true)} className="flex items-center gap-1 px-2 py-1 bg-gray-900 text-white text-[8px] font-bold rounded hover:bg-gray-800 transition-all uppercase tracking-wider">
+                      <Search className="h-2.5 w-2.5" /> Produkt-Datenbank
                    </button>
-                   <button onClick={() => handleAddPosition('separator')} className="px-3 py-1.5 bg-gray-50 text-[10px] font-bold text-gray-500 rounded-lg hover:bg-gray-100 transition-all uppercase tracking-wider">Trenner</button>
-                   <button onClick={() => handleAddPosition('note')} className="px-3 py-1.5 bg-gray-50 text-[10px] font-bold text-gray-500 rounded-lg hover:bg-gray-100 transition-all uppercase tracking-wider">Textzeile</button>
+                   <button onClick={() => handleAddPosition('separator')} className="px-2 py-1 bg-gray-50 text-[8px] font-bold text-gray-500 rounded hover:bg-gray-100 transition-all uppercase tracking-wider">Trenner</button>
+                   <button onClick={() => handleAddPosition('note')} className="px-2 py-1 bg-gray-50 text-[8px] font-bold text-gray-500 rounded hover:bg-gray-100 transition-all uppercase tracking-wider">Textzeile</button>
                 </div>
               </div>
 
-              <div className="p-2">
+              <div className="p-1">
                 <DragDropContext onDragEnd={onDragEnd}>
                   <Droppable droppableId="positions">
                     {(provided) => (
-                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-1">
+                      <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-0.5">
                         {invoice.positions?.map((pos, index) => (
                           <Draggable key={pos.id} draggableId={pos.id} index={index}>
                             {(provided) => (
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                className={`p-4 rounded-2xl border border-transparent hover:border-gray-100 hover:bg-gray-50/50 transition-all group flex items-start gap-4 ${pos.type !== 'item' ? 'bg-gray-50/30' : ''}`}
+                                className={`p-2 rounded-xl border border-transparent hover:border-gray-100 hover:bg-gray-50/30 transition-all group flex items-start gap-2.5 ${pos.type !== 'item' ? 'bg-gray-50/15' : ''}`}
                               >
-                                <div {...provided.dragHandleProps} className="mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <GripVertical className="h-4 w-4 text-gray-300" />
+                                <div {...provided.dragHandleProps} className="mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
+                                  <GripVertical className="h-3.5 w-3.5 text-gray-300" />
                                 </div>
 
-                                <div className="flex-1 grid grid-cols-12 gap-4">
+                                <div className="flex-1 grid grid-cols-12 gap-3">
                                   {pos.type === 'item' ? (
                                     <>
-                                      <div className="col-span-12 md:col-span-6 space-y-1">
+                                      <div className="col-span-12 md:col-span-6 space-y-0.5">
                                         <input 
                                           type="text" 
                                           placeholder="Produkt/Dienstleistung" 
-                                          className="w-full bg-transparent font-bold text-sm outline-none border-b border-transparent focus:border-black/10 pb-1"
+                                          className="w-full bg-transparent font-bold text-xs outline-none border-b border-transparent focus:border-black/5 pb-0.5"
                                           value={pos.name}
                                           onChange={(e) => updatePosition(pos.id, { name: e.target.value })}
                                         />
                                         <textarea 
                                           placeholder="Beschreibung (optional)" 
-                                          className="w-full bg-transparent text-xs text-gray-500 outline-none resize-none"
+                                          className="w-full bg-transparent text-[10px] text-gray-400 outline-none resize-none font-medium leading-relaxed"
                                           rows={1}
                                           value={pos.description}
                                           onChange={(e) => updatePosition(pos.id, { description: e.target.value })}
@@ -350,12 +349,12 @@ export default function InvoiceEditorPage() {
                                       <div className="col-span-3 md:col-span-1">
                                         <input 
                                           type="number" 
-                                          className="w-full bg-transparent text-sm text-center outline-none border-b border-transparent focus:border-black/10 pb-1"
+                                          className="w-full bg-transparent text-xs text-center outline-none border-b border-transparent focus:border-black/5 pb-0.5 font-bold"
                                           value={pos.quantity}
                                           onChange={(e) => updatePosition(pos.id, { quantity: parseFloat(e.target.value) || 0 })}
                                         />
                                         <select 
-                                          className="w-full bg-transparent text-[10px] text-gray-400 outline-none appearance-none text-center cursor-pointer"
+                                          className="w-full bg-transparent text-[8px] text-gray-400 outline-none appearance-none text-center cursor-pointer font-bold"
                                           value={pos.unit}
                                           onChange={(e) => updatePosition(pos.id, { unit: e.target.value as any })}
                                         >
@@ -365,14 +364,14 @@ export default function InvoiceEditorPage() {
                                       <div className="col-span-3 md:col-span-2">
                                         <input 
                                           type="number" 
-                                          className="w-full bg-transparent text-sm text-right outline-none border-b border-transparent focus:border-black/10 pb-1 font-medium"
+                                          className="w-full bg-transparent text-xs text-right outline-none border-b border-transparent focus:border-black/5 pb-0.5 font-bold"
                                           value={pos.priceNet}
                                           onChange={(e) => updatePosition(pos.id, { priceNet: parseFloat(e.target.value) || 0 })}
                                         />
-                                        <div className="flex items-center justify-end gap-1">
-                                          <span className="text-[10px] text-gray-400 uppercase">VAT</span>
+                                        <div className="flex items-center justify-end gap-0.5">
+                                          <span className="text-[8px] text-gray-400 uppercase font-bold">USt.</span>
                                           <select 
-                                            className="bg-transparent text-[10px] font-bold outline-none"
+                                            className="bg-transparent text-[8px] font-bold outline-none"
                                             value={pos.vatRate}
                                             onChange={(e) => updatePosition(pos.id, { vatRate: parseInt(e.target.value) })}
                                           >
@@ -383,19 +382,19 @@ export default function InvoiceEditorPage() {
                                         </div>
                                       </div>
                                       <div className="col-span-3 md:col-span-1">
-                                        <div className="flex items-center gap-1 border-b border-transparent focus-within:border-black/10">
+                                        <div className="flex items-center gap-0.5 border-b border-transparent focus-within:border-black/5">
                                           <input 
                                             type="number" 
-                                            className="w-full bg-transparent text-sm text-right outline-none pb-1"
+                                            className="w-full bg-transparent text-xs text-right outline-none pb-0.5 font-medium"
                                             value={pos.discountPercent}
                                             onChange={(e) => updatePosition(pos.id, { discountPercent: parseFloat(e.target.value) || 0 })}
                                           />
-                                          <Percent className="h-3 w-3 text-gray-300" />
+                                          <Percent className="h-2.5 w-2.5 text-gray-300 shrink-0" />
                                         </div>
-                                        <p className="text-[10px] text-gray-300 text-right mt-1">DISC.</p>
+                                        <p className="text-[7px] text-gray-300 text-right mt-0.5 font-bold">RAB.</p>
                                       </div>
-                                      <div className="col-span-3 md:col-span-2 text-right pt-1">
-                                        <p className="text-sm font-bold text-gray-900">
+                                      <div className="col-span-3 md:col-span-2 text-right pt-0.5">
+                                        <p className="text-xs font-bold text-gray-900">
                                           {formatCurrency((pos.quantity * pos.priceNet) * (1 - pos.discountPercent / 100))}
                                         </p>
                                       </div>
@@ -404,7 +403,7 @@ export default function InvoiceEditorPage() {
                                     <div className="col-span-12">
                                       <input 
                                         type="text" 
-                                        className={`w-full bg-transparent outline-none font-bold ${pos.type === 'separator' ? 'text-gray-900' : 'text-gray-400 italic'}`}
+                                        className={`w-full bg-transparent outline-none font-bold text-xs ${pos.type === 'separator' ? 'text-gray-900' : 'text-gray-400 italic'}`}
                                         placeholder={pos.type === 'separator' ? "Überschrift..." : "Hinweistext hinzufügen..."}
                                         value={pos.name}
                                         onChange={(e) => updatePosition(pos.id, { name: e.target.value })}
@@ -413,8 +412,8 @@ export default function InvoiceEditorPage() {
                                   )}
                                 </div>
 
-                                <button onClick={() => removePosition(pos.id)} className="mt-1 p-2 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                                  <Trash2 className="h-4 w-4" />
+                                <button onClick={() => removePosition(pos.id)} className="mt-0.5 p-1 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             )}
@@ -427,42 +426,42 @@ export default function InvoiceEditorPage() {
                 </DragDropContext>
               </div>
 
-              <div className="p-4 sm:p-8 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="p-3 sm:p-4 border-t border-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-50/20">
                  <button 
                   onClick={() => handleAddPosition('item')}
-                  className="flex items-center gap-2 text-sm font-bold text-black hover:opacity-70 transition-all self-start sm:self-auto"
+                  className="flex items-center gap-1 text-xs font-bold text-black hover:opacity-70 transition-all self-start sm:self-auto uppercase tracking-wider"
                  >
-                   <Plus className="h-5 w-5" /> Position hinzufügen
+                   <Plus className="h-4 w-4" /> Position hinzufügen
                  </button>
                  
-                 <div className="flex items-center gap-4 self-end sm:self-auto">
+                 <div className="flex items-center gap-3 self-end sm:self-auto">
                     <div className="text-right">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Zwischensumme (Netto)</p>
-                      <p className="text-xl font-bold text-gray-900">{formatCurrency(invoice.amountNet || 0)}</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Zwischensumme (Netto)</p>
+                      <p className="text-sm font-bold text-gray-900">{formatCurrency(invoice.amountNet || 0)}</p>
                     </div>
                  </div>
               </div>
             </section>
 
             {/* Section: Texts */}
-            <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 space-y-6">
-               <div className="space-y-4">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <Type className="h-4 w-4" /> Einleitungstext
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+               <div className="space-y-2">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <Type className="h-3.5 w-3.5 text-gray-300" /> Einleitungstext
                   </label>
                   <textarea 
-                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-black/5 min-h-[80px]"
-                    placeholder="z.B. Anbei erhalten Sie die Rechnung für die im Mai 2024 erbrachten Leistungen."
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs outline-none focus:ring-1 focus:ring-black/5 min-h-[60px] font-medium placeholder-gray-300"
+                    placeholder="z.B. Anbei erhalten Sie die Rechnung für die erbrachten Leistungen."
                     value={invoice.introText}
                     onChange={(e) => setInvoice({...invoice, introText: e.target.value})}
                   />
                </div>
-               <div className="space-y-4">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-2">
-                    <FileText className="h-4 w-4" /> Fußzeilentext / Rechtliches
+               <div className="space-y-2">
+                  <label className="text-[9px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-gray-300" /> Fußzeilentext / Rechtliches
                   </label>
                   <textarea 
-                    className="w-full bg-gray-50 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-black/5 min-h-[80px]"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl p-3 text-xs outline-none focus:ring-1 focus:ring-black/5 min-h-[60px] font-medium placeholder-gray-300"
                     placeholder="z.B. Kleinunternehmerregelung gemäß § 19 UStG..."
                     value={invoice.footerText}
                     onChange={(e) => setInvoice({...invoice, footerText: e.target.value})}
@@ -472,36 +471,37 @@ export default function InvoiceEditorPage() {
           </div>
 
           {/* Right Side: Settings & Totals */}
-          <div className="space-y-8">
+          <div className="space-y-6">
             
             {/* Totals Summary Card */}
-            <section className="bg-black text-white rounded-[40px] p-8 shadow-2xl shadow-black/20">
-               <h3 className="text-sm font-bold text-white/50 uppercase tracking-widest mb-6">Berechnung</h3>
-               <div className="space-y-4">
-                  <div className="flex justify-between text-sm">
+            <section className="bg-neutral-900 text-white rounded-2xl p-4 shadow-xl relative overflow-hidden">
+               <h3 className="text-[9px] font-bold text-white/50 uppercase tracking-widest mb-3">Berechnung</h3>
+               <div className="space-y-2.5 relative z-10">
+                  <div className="flex justify-between text-xs font-medium">
                      <span className="text-white/50">Netto Gesamt</span>
                      <span className="font-bold">{formatCurrency(invoice.amountNet || 0)}</span>
                   </div>
-                  <div className="flex justify-between text-sm">
-                     <span className="text-white/50">VAT ({invoiceSettings.defaultVatRate}%)</span>
+                  <div className="flex justify-between text-xs font-medium">
+                     <span className="text-white/50">MwSt. ({invoiceSettings.defaultVatRate}%)</span>
                      <span className="font-bold">{formatCurrency(invoice.amountVat || 0)}</span>
                   </div>
-                  <div className="h-px bg-white/10 my-4" />
-                  <div className="flex justify-between items-end">
-                     <span className="text-lg font-bold">Brutto Gesamt</span>
-                     <span className="text-3xl font-bold tracking-tight">{formatCurrency(invoice.amountGross || 0)}</span>
+                  <div className="h-px bg-white/10 my-2" />
+                  <div className="flex justify-between items-center">
+                     <span className="text-xs font-bold text-white/70">Brutto Gesamt</span>
+                     <span className="text-lg font-black tracking-tight">{formatCurrency(invoice.amountGross || 0)}</span>
                   </div>
                </div>
+               <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/5 rounded-full blur-2xl" />
             </section>
 
             {/* Customer Selection */}
-            <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 space-y-6">
-               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Customer</h3>
-               <div className="space-y-4">
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+               <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Empfänger (Kunde)</h3>
+               <div className="space-y-3">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-300" />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-300" />
                     <select 
-                      className="w-full pl-10 pr-4 py-3 bg-gray-50 rounded-2xl text-sm appearance-none outline-none focus:ring-2 focus:ring-black/5"
+                      className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs appearance-none outline-none focus:ring-1 focus:ring-black/5 font-bold"
                       value={invoice.customerId}
                       onChange={(e) => {
                         const c = customers.find(cust => cust.id === e.target.value);
@@ -514,40 +514,40 @@ export default function InvoiceEditorPage() {
                   </div>
                   <button 
                     onClick={() => setIsCustomerModalOpen(true)}
-                    className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-gray-100 rounded-2xl text-[10px] font-bold text-gray-400 hover:border-black hover:text-black transition-all uppercase tracking-widest"
+                    className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-gray-200 rounded-xl text-[9px] font-bold text-gray-400 hover:border-black hover:text-black transition-all uppercase tracking-widest"
                   >
-                    <UserPlus className="h-4 w-4" /> Neuen Kunden hinzufügen
+                    <UserPlus className="h-3.5 w-3.5" /> Neuen Kunden anlegen
                   </button>
                </div>
             </section>
 
             {/* Invoice Basics */}
-            <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 space-y-6">
-               <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest">Grundlagen</h3>
-               <div className="grid grid-cols-1 gap-6">
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsnummer</label>
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+               <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsdetails</h3>
+               <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-1.5">
+                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsnummer</label>
                      <input 
                       type="text" 
-                      className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm font-bold outline-none"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none"
                       value={invoice.id}
                       onChange={(e) => setInvoice({...invoice, id: e.target.value})}
                      />
                   </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Rechnungstyp</label>
+                  <div className="space-y-1.5">
+                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungstyp</label>
                      <select 
-                      className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm outline-none appearance-none"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs outline-none appearance-none font-bold"
                       value={invoice.type}
                       onChange={(e) => setInvoice({...invoice, type: e.target.value as any})}
                      >
                        {INVOICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
                      </select>
                   </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Kategorie</label>
+                  <div className="space-y-1.5">
+                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Kategorie</label>
                      <select 
-                      className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm outline-none appearance-none"
+                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs outline-none appearance-none font-bold"
                       value={invoice.category || ""}
                       onChange={(e) => setInvoice({...invoice, category: e.target.value})}
                      >
@@ -555,21 +555,21 @@ export default function InvoiceEditorPage() {
                        {SYSTEM_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                      </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Datum</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsdatum</label>
                       <input 
                         type="date" 
-                        className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-[10px] font-bold outline-none"
+                        className="w-full px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none"
                         value={invoice.date}
                         onChange={(e) => setInvoice({...invoice, date: e.target.value})}
                       />
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Due Datum</label>
+                    <div className="space-y-1.5">
+                      <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Fälligkeit</label>
                       <input 
                         type="date" 
-                        className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-[10px] font-bold outline-none"
+                        className="w-full px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none"
                         value={invoice.dueDate}
                         onChange={(e) => setInvoice({...invoice, dueDate: e.target.value})}
                       />
@@ -579,26 +579,26 @@ export default function InvoiceEditorPage() {
             </section>
 
             {/* Internationalization */}
-            <section className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-8 space-y-6">
-               <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                       <Globe className="h-3 w-3" /> Language
+            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
+               <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                       <Globe className="h-3 w-3 text-gray-300" /> Sprache
                      </label>
                      <select 
-                      className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs outline-none"
+                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none font-bold"
                       value={invoice.language}
                       onChange={(e) => setInvoice({...invoice, language: e.target.value as any})}
                      >
                        {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
                      </select>
                   </div>
-                  <div className="space-y-2">
-                     <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                       <Euro className="h-3 w-3" /> Currency
+                  <div className="space-y-1.5">
+                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
+                       <Euro className="h-3 w-3 text-gray-300" /> Währung
                      </label>
                      <select 
-                      className="w-full px-3 py-2 bg-gray-50 rounded-xl text-xs outline-none"
+                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none font-bold"
                       value={invoice.currency}
                       onChange={(e) => setInvoice({...invoice, currency: e.target.value})}
                      >
@@ -613,29 +613,29 @@ export default function InvoiceEditorPage() {
           </div>
         </div>
       ) : activeTab === "payments" ? (
-        <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-12 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-           <div className="h-20 w-20 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Euro className="h-10 w-10 text-emerald-500" />
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center animate-in fade-in duration-200">
+           <div className="h-14 w-14 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-emerald-100">
+              <Euro className="h-6 w-6 text-emerald-500" />
            </div>
-           <h3 className="text-xl font-bold text-gray-900">Zahlungserfassung</h3>
-           <p className="text-sm text-gray-400 mt-2 max-w-sm mx-auto">Erfassen Sie hier Teil- oder Vollzahlungen für diese Rechnung.</p>
-           <form onSubmit={handleAddPayment} className="mt-8 max-w-xs mx-auto flex gap-4">
-              <input name="amount" type="number" step="0.01" required className="flex-1 px-4 py-3 bg-gray-50 rounded-xl text-sm outline-none" placeholder="Betrag in €" />
-              <button type="submit" className="px-6 py-3 bg-black text-white rounded-xl text-sm font-bold hover:bg-gray-800 transition-all">OK</button>
+           <h3 className="text-base font-bold text-gray-900">Zahlungserfassung</h3>
+           <p className="text-xs text-gray-400 mt-1 max-w-sm mx-auto leading-relaxed">Erfassen Sie hier Teil- oder Vollzahlungen für diese Rechnung.</p>
+           <form onSubmit={handleAddPayment} className="mt-6 max-w-xs mx-auto flex gap-3">
+              <input name="amount" type="number" step="0.01" required className="flex-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-lg text-xs font-bold outline-none" placeholder="Betrag in €" />
+              <button type="submit" className="px-4 py-2 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition-all">Verbuchen</button>
            </form>
         </div>
       ) : (
-        <div className="bg-white rounded-[40px] border border-gray-100 shadow-sm p-12 text-center animate-in fade-in slide-in-from-bottom-2 duration-300">
-           <div className="h-20 w-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-              <Clock className="h-10 w-10 text-blue-500" />
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 text-center animate-in fade-in duration-200">
+           <div className="h-14 w-14 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <Clock className="h-6 w-6 text-blue-500" />
            </div>
-           <h3 className="text-xl font-bold text-gray-900">Rechnungshistorie</h3>
-           <p className="text-sm text-gray-400 mt-2">Alle Änderungen und Ereignisse werden hier protokolliert.</p>
-           <div className="mt-8 space-y-4 max-w-md mx-auto text-left">
+           <h3 className="text-base font-bold text-gray-900">Rechnungshistorie</h3>
+           <p className="text-xs text-gray-400 mt-1">Alle Änderungen und Ereignisse werden hier protokolliert.</p>
+           <div className="mt-6 space-y-3 max-w-md mx-auto text-left">
               {(invoice.history || []).map((h, i) => (
-                <div key={i} className="flex gap-4 p-4 bg-gray-50 rounded-2xl">
-                   <div className="text-[10px] font-bold text-gray-300 w-20">{h.date.split('T')[0]}</div>
-                   <div className="text-sm font-medium text-gray-700">{h.action} von {h.user}</div>
+                <div key={i} className="flex gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100/50">
+                   <div className="text-[8px] font-bold text-gray-400 w-16 uppercase tracking-wider">{h.date.split('T')[0]}</div>
+                   <div className="text-xs font-semibold text-gray-700 leading-snug">{h.action} von {h.user}</div>
                 </div>
               ))}
               {(!invoice.history || invoice.history.length === 0) && <p className="text-center text-[10px] text-gray-300 italic">Noch keine Einträge vorhanden.</p>}
@@ -646,10 +646,10 @@ export default function InvoiceEditorPage() {
       {/* New Customer Modal */}
       {isCustomerModalOpen && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
-          <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200">
-            <div className="p-6 sm:p-8 border-b border-gray-50 flex items-center justify-between">
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Kunden hinzufügen</h2>
-              <button onClick={() => setIsCustomerModalOpen(false)} className="text-gray-400 hover:text-black"><X className="h-6 w-6" /></button>
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="p-4 sm:p-5 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-gray-900">Kunden hinzufügen</h2>
+              <button onClick={() => setIsCustomerModalOpen(false)} className="text-gray-400 hover:text-black transition-colors"><X className="h-5 w-5" /></button>
             </div>
             <form onSubmit={(e: React.FormEvent<HTMLFormElement>) => {
               e.preventDefault();
@@ -666,16 +666,16 @@ export default function InvoiceEditorPage() {
               setInvoice({ ...invoice, customerId: newC.id, customerName: newC.name, email: newC.email });
               setIsCustomerModalOpen(false);
               toast.success("Customer added and selected");
-            }} className="p-6 sm:p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Firmenname *</label>
-                <input name="name" required className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm outline-none" placeholder="e.g. Future Tech Ltd." />
+            }} className="p-4 sm:p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Firmenname *</label>
+                <input name="name" required className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" placeholder="e.g. Future Tech Ltd." />
               </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">E-Mail-Adresse *</label>
-                <input name="email" type="email" required className="w-full px-4 py-3 bg-gray-50 rounded-2xl text-sm outline-none" placeholder="billing@company.com" />
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">E-Mail-Adresse *</label>
+                <input name="email" type="email" required className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none" placeholder="billing@company.com" />
               </div>
-              <button type="submit" className="w-full py-4 bg-black text-white rounded-2xl text-xs font-bold hover:bg-gray-800 shadow-xl transition-all">Erstellen & Auswählen</button>
+              <button type="submit" className="w-full py-2.5 bg-black text-white rounded-xl text-[10px] font-bold hover:bg-gray-800 transition-all uppercase tracking-wider">Erstellen & Auswählen</button>
             </form>
           </div>
         </div>
