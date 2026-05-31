@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { 
   useDataStore, 
@@ -9,6 +9,7 @@ import {
   InvoiceType, 
   Customer, 
   Product,
+  SavedPosition,
   SYSTEM_CATEGORIES,
   LEISTUNGS_CATEGORIES
 } from "@/store/data-store";
@@ -35,7 +36,9 @@ import {
   Copy,
   Printer,
   Eye,
-  Clock
+  Clock,
+  Star,
+  Bookmark
 } from "lucide-react";
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { toast } from "sonner";
@@ -44,68 +47,95 @@ import { format, addDays } from "date-fns";
 const UNITS = ["hour", "piece", "day", "month", "project", "package"] as const;
 const LANGUAGES = ["German", "English", "Turkish"] as const;
 const TAX_MODES = ["Austria", "Germany", "EU", "non-EU"] as const;
-const INVOICE_TYPES: any[] = [
-  "Standardrechnung", "Wiederkehrende Rechnung", "Teilrechnung", 
-  "Schlussrechnung", "Abschlagsrechnung", "Proforma-Rechnung", 
-  "Gutschrift", "Stornorechnung"
+const INVOICE_TYPES = [
+  "Standardrechnung", 
+  "Angebot", 
+  "Anzahlung", 
+  "Teilrechnung", 
+  "Schlussrechnung", 
+  "Wiederkehrende Rechnung", 
+  "Gutschrift", 
+  "Stornorechnung"
 ];
 
 export default function InvoiceEditorPage() {
-  const params = useParams();
   const router = useRouter();
+  const params = useParams();
+  const searchParams = useSearchParams();
+  const id = params.id as string;
+  const printFlag = searchParams.get("print") === "true";
+  const isNew = id === "new";
+
   const { 
     invoices, 
-    customers, 
-    products, 
-    invoiceSettings, 
-    addInvoice, 
-    updateInvoice,
+    deleteInvoice, 
+    updateInvoice, 
+    addInvoice,
+    invoiceSettings,
+    customers,
     addCustomer,
-    addProduct
+    products,
+    savedPositions,
+    addSavedPosition,
+    deleteSavedPosition
   } = useDataStore();
-  const searchParams = useSearchParams();
-  const printFlag = searchParams.get("print") === "true";
 
-  const isNew = params.id === "new";
-  const existingInvoice = useMemo(() => 
-    invoices.find(inv => inv.id === params.id), 
-  [invoices, params.id]);
+  // Selected PDF Design Template
+  const [selectedTemplate, setSelectedTemplate] = useState<"modern" | "classic" | "creative">("modern");
 
-  // Editor State
+  // State
   const [invoice, setInvoice] = useState<Partial<Invoice>>({
     id: "",
     type: "Standardrechnung" as any,
-    date: format(new Date(), "yyyy-MM-dd"),
-    dueDate: format(addDays(new Date(), 14), "yyyy-MM-dd"),
+    customerId: "",
+    customerName: "",
+    email: "",
+    date: new Date().toISOString().split('T')[0],
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    paymentTerms: "14 Tage netto",
     currency: "EUR",
     language: "German",
-    taxMode: "Germany",
-    paymentTerms: "Zahlbar innerhalb von 14 Tagen.",
-    paymentMethod: "Bank transfer",
-    positions: [],
+    taxMode: "Austria",
     amountNet: 0,
     amountVat: 0,
     amountGross: 0,
     amountPaid: 0,
-    status: "ENTWURF"
+    status: "ENTWURF",
+    positions: [],
+    introText: "",
+    footerText: "",
+    pdfTemplate: "modern"
   });
 
-  // UI States
-  const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState<"data" | "payments" | "history">("data");
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
+  const [isSavedPositionsModalOpen, setIsSavedPositionsModalOpen] = useState(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
 
+  // Dirty State Exit Warnings
+  const [isDirty, setIsDirty] = useState(false);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Hydrate from existing invoice
   useEffect(() => {
-    if (!isNew && existingInvoice) {
-      setInvoice(existingInvoice);
-      if (printFlag) {
-        setIsPreviewOpen(true);
-        setTimeout(() => window.print(), 1000);
+    if (!isNew && invoices.length > 0) {
+      const existing = invoices.find(inv => inv.id === id);
+      if (existing) {
+        setInvoice(existing);
+        if (existing.pdfTemplate) {
+          setSelectedTemplate(existing.pdfTemplate as any);
+        }
       }
-    } else if (isNew) {
-      // Auto-generate invoice number based on settings
-      const year = new Date().getFullYear();
-      const num = String(invoiceSettings.nextNumber).padStart(3, '0');
+    }
+  }, [id, isNew, invoices]);
+
+  // Set default settings for new invoice
+  useEffect(() => {
+    if (isNew && invoiceSettings) {
+      const date = new Date();
+      const year = date.getFullYear();
+      const num = String(invoiceSettings.nextNumber || 1).padStart(3, '0');
       setInvoice(prev => ({
         ...prev,
         id: `RE-${year}-${num}`,
@@ -115,11 +145,40 @@ export default function InvoiceEditorPage() {
         footerText: invoiceSettings.defaultFooter
       }));
     }
-  }, [isNew, existingInvoice, invoiceSettings]);
+  }, [isNew, invoiceSettings]);
 
-  // Calculations
+  // Track Unsaved Changes
+  useEffect(() => {
+    if (isInitialLoad) {
+      setIsInitialLoad(false);
+      return;
+    }
+    setIsDirty(true);
+  }, [invoice]);
+
+  // Browser Exit Warnings
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isDirty) {
+        e.preventDefault();
+        e.returnValue = "Sie haben ungespeicherte Änderungen. Möchten Sie diese als Entwurf speichern?";
+        return e.returnValue;
+      }
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isDirty]);
+
+  // Print on direct flag
+  useEffect(() => {
+    if (printFlag && invoice.id) {
+      setTimeout(() => window.print(), 1000);
+    }
+  }, [printFlag, invoice.id]);
+
+  // Calculations (Dynamic subtotal based on Price and Discount, quantity is hidden and defaulted to 1)
   const getPositionNetSubtotal = (pos: InvoicePosition) => {
-    const itemTotal = pos.quantity * pos.priceNet;
+    const itemTotal = pos.priceNet;
     if (pos.discountType === "FIXED") {
       return Math.max(0, itemTotal - (pos.discountValue || 0));
     } else {
@@ -134,7 +193,6 @@ export default function InvoiceEditorPage() {
       return acc + getPositionNetSubtotal(pos);
     }, 0) || 0;
 
-    // VAT calculation
     const vat = invoice.positions?.reduce((acc, pos) => {
       if (pos.type !== 'item') return acc;
       const netSub = getPositionNetSubtotal(pos);
@@ -199,9 +257,60 @@ export default function InvoiceEditorPage() {
     setInvoice(prev => ({ ...prev, positions: items }));
   };
 
-  // Tabs
-  const [activeTab, setActiveTab] = useState<"data" | "payments" | "history">("data");
-  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  // Saved Positions Library handlers
+  const handleAddSavedPosition = (sp: SavedPosition) => {
+    const newPos: InvoicePosition = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: sp.name,
+      description: sp.description,
+      quantity: 1,
+      unit: "piece",
+      priceNet: sp.priceNet,
+      vatRate: sp.vatRate,
+      category: sp.category || "",
+      priceType: sp.priceType || "NET",
+      priceGross: sp.priceGross || (sp.priceNet * (1 + sp.vatRate / 100)),
+      discountPercent: 0,
+      discountType: "PERCENT",
+      discountValue: 0,
+      type: "item"
+    };
+    setInvoice(prev => ({
+      ...prev,
+      positions: [...(prev.positions || []), newPos]
+    }));
+    setIsSavedPositionsModalOpen(false);
+    toast.success("Position aus Dienstleistungs-Bibliothek eingefügt!");
+  };
+
+  const handleSaveToLibrary = (pos: InvoicePosition) => {
+    const newSaved: SavedPosition = {
+      id: "sp-" + Date.now(),
+      name: pos.name,
+      description: pos.description,
+      priceNet: pos.priceNet,
+      vatRate: pos.vatRate,
+      category: pos.category || "",
+      priceType: pos.priceType || "NET",
+      priceGross: pos.priceGross || (pos.priceNet * (1 + pos.vatRate / 100))
+    };
+    addSavedPosition(newSaved);
+    toast.success("Als fertige Dienstleistungsvorlage gespeichert!");
+  };
+
+  // Unsaved Prompt on Back
+  const handleBack = () => {
+    if (isDirty) {
+      const confirmExit = confirm("Sie haben ungespeicherte Änderungen.\n\nMöchten Sie diese Änderungen jetzt als ENTWURF speichern?\n\n[OK] = Speichern\n[Abbrechen] = Änderungen verwerfen");
+      if (confirmExit) {
+        handleSave();
+      } else {
+        router.push("/accounting/invoices");
+      }
+    } else {
+      router.push("/accounting/invoices");
+    }
+  };
 
   // Validation
   const validate = () => {
@@ -218,12 +327,19 @@ export default function InvoiceEditorPage() {
     const error = validate();
     if (error) return toast.error(error);
     
+    // Save template style selection
+    const finalInvoice = {
+      ...invoice,
+      pdfTemplate: selectedTemplate
+    } as Invoice;
+
     if (isNew) {
-      addInvoice({ ...invoice, status: "OFFEN" } as Invoice);
+      addInvoice({ ...finalInvoice, status: "OFFEN" });
     } else {
-      updateInvoice(invoice.id!, invoice);
+      updateInvoice(invoice.id!, finalInvoice);
     }
     
+    setIsDirty(false); // Clear dirty state
     toast.success(isNew ? "Rechnung erstellt" : "Rechnung aktualisiert");
     router.push("/accounting/invoices");
   };
@@ -239,7 +355,12 @@ export default function InvoiceEditorPage() {
       priceNet: p.defaultPrice,
       vatRate: p.vatRate,
       discountPercent: 0,
-      type: "item"
+      type: "item",
+      category: p.category || "",
+      priceGross: p.defaultPrice * (1 + p.vatRate / 100),
+      priceType: "NET",
+      discountType: "PERCENT",
+      discountValue: 0
     };
     setInvoice(prev => ({
       ...prev,
@@ -259,12 +380,382 @@ export default function InvoiceEditorPage() {
   const formatCurrency = (val: number) => {
     return new Intl.NumberFormat('de-DE', { style: 'currency', currency: invoice.currency || 'EUR' }).format(val);
   };
+
+  const getDocumentTitle = (type: string) => {
+    if (type === "Angebot") return "ANGEBOT";
+    if (type === "Anzahlung") return "ANZAHLUNGSRECHNUNG";
+    if (type === "Teilrechnung") return "TEILRECHNUNG";
+    if (type === "Schlussrechnung") return "SCHLUSSRECHNUNG";
+    if (type === "Gutschrift") return "GUTSCHRIFT";
+    if (type === "Stornorechnung") return "STORNORECHNUNG";
+    return "RECHNUNG";
+  };
+
+  // Reusable PDF content layout supporting multiple designs
+  const InvoicePdfContent = () => {
+    const docTitle = getDocumentTitle(invoice.type || "");
+    
+    // Modern Minimalist Template
+    if (selectedTemplate === "modern") {
+      return (
+        <div className="bg-white p-8 sm:p-12 text-left text-gray-800 text-[11px] leading-relaxed shadow-sm min-h-[297mm] flex flex-col justify-between">
+          <div>
+            <div className="flex justify-between items-start mb-14">
+              <div>
+                <div className="h-12 w-12 bg-neutral-900 rounded-xl mb-4 flex items-center justify-center text-white font-bold text-sm">TM</div>
+                <p className="font-bold text-gray-900 text-xs">{invoiceSettings.companyName}</p>
+                <p className="text-[9px] text-gray-400 mt-1 whitespace-pre-line">{invoiceSettings.companyAddress}</p>
+              </div>
+              <div className="text-right">
+                <h1 className="text-2xl font-black tracking-tight text-gray-900 mb-1">{docTitle}</h1>
+                <p className="text-[10px] font-bold text-gray-400">Nr. {invoice.id}</p>
+              </div>
+            </div>
+
+            <div className="flex justify-between mb-12">
+              <div className="max-w-[240px]">
+                <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-1.5 border-b border-gray-100 pb-0.5">Empfänger</p>
+                <p className="text-xs font-bold text-gray-900">{invoice.customerName}</p>
+                <p className="text-[10px] text-gray-500 mt-0.5">{invoice.email}</p>
+              </div>
+              <div className="flex gap-8">
+                <div className="text-right">
+                   <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-0.5">Datum</p>
+                   <p className="text-[10px] font-bold text-gray-900">{invoice.date}</p>
+                </div>
+                <div className="text-right">
+                   <p className="text-[9px] font-black text-gray-300 uppercase tracking-widest mb-0.5">Fällig am</p>
+                   <p className="text-[10px] font-bold text-gray-900">{invoice.dueDate}</p>
+                </div>
+              </div>
+            </div>
+
+            {invoice.introText && (
+              <p className="mb-8 text-gray-600 font-medium whitespace-pre-line leading-relaxed">{invoice.introText}</p>
+            )}
+
+            <table className="w-full text-left mb-10">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest">Leistungsbeschreibung / Position</th>
+                  <th className="py-2.5 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Betrag</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.positions?.map((pos) => (
+                  <tr key={pos.id} className="border-b border-gray-100">
+                    <td className="py-4">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-gray-900">{pos.name}</p>
+                        {pos.category && (
+                          <span className="px-1.5 py-0.5 bg-gray-50 text-gray-400 text-[7px] font-black uppercase tracking-wider rounded border border-gray-100/50">{pos.category}</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-400 mt-0.5 leading-relaxed whitespace-pre-line">{pos.description}</p>
+                    </td>
+                    <td className="py-4 text-right text-xs font-bold text-gray-900">{formatCurrency(getPositionNetSubtotal(pos))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="flex justify-end mb-12">
+              <div className="w-56 space-y-2">
+                <div className="flex justify-between text-[10px] font-medium text-gray-500">
+                   <span>Zwischensumme (Netto)</span>
+                   <span>{formatCurrency(invoice.amountNet || 0)}</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-medium text-gray-500">
+                   <span>USt. ({invoiceSettings.defaultVatRate === 19 ? 20 : (invoiceSettings.defaultVatRate || 20)}%)</span>
+                   <span>{formatCurrency(invoice.amountVat || 0)}</span>
+                </div>
+                <div className="h-px bg-gray-100 my-2" />
+                <div className="flex justify-between text-sm font-black text-gray-950">
+                   <span>Gesamtbetrag</span>
+                   <span>{formatCurrency(invoice.amountGross || 0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            {invoice.footerText && (
+              <p className="text-[9px] text-gray-400 italic mb-8 border-t border-gray-50 pt-3 leading-relaxed">{invoice.footerText}</p>
+            )}
+
+            <div className="border-t border-gray-100 pt-6 text-[8px] text-gray-400 grid grid-cols-3 gap-6">
+              <div>
+                <p className="font-bold text-gray-800 uppercase tracking-widest mb-1.5">Zahlungsdetails</p>
+                <p>Konto: {invoiceSettings.bankOwner}</p>
+                <p>Bank: {invoiceSettings.bankName}</p>
+                <p>IBAN: {invoiceSettings.bankIban}</p>
+                <p>BIC: {invoiceSettings.bankBic}</p>
+              </div>
+              <div>
+                <p className="font-bold text-gray-800 uppercase tracking-widest mb-1.5">Unternehmensdaten</p>
+                <p>{invoiceSettings.companyName}</p>
+                <p>Steuer-Nr: {invoiceSettings.companyTaxId}</p>
+                <p>UID: {invoiceSettings.companyVatId}</p>
+                <p>Firmenbuch: {invoiceSettings.firmenbuch}</p>
+              </div>
+              <div>
+                <p className="font-bold text-gray-800 uppercase tracking-widest mb-1.5">Bedingungen</p>
+                <p>{invoice.paymentTerms}</p>
+                <p className="mt-1">Vielen Dank für das Vertrauen!</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Corporate Classic (Navy Accent)
+    if (selectedTemplate === "classic") {
+      return (
+        <div className="bg-white text-left text-gray-800 text-[11px] leading-relaxed shadow-sm min-h-[297mm] flex flex-col justify-between relative border-t-8 border-indigo-900">
+          
+          <div className="p-8 sm:p-12 pt-10">
+            <div className="flex justify-between items-start mb-12">
+              <div>
+                <div className="text-xl font-black text-indigo-900 tracking-tight flex items-center gap-1.5 mb-2">
+                  <Bookmark className="h-5 w-5 text-indigo-900" />
+                  {invoiceSettings.companyName}
+                </div>
+                <p className="text-[9px] text-gray-400 whitespace-pre-line leading-relaxed">{invoiceSettings.companyAddress}</p>
+              </div>
+              <div className="text-right">
+                <h1 className="text-3xl font-black tracking-tight text-indigo-900 leading-none mb-1">{docTitle}</h1>
+                <p className="text-[10px] font-bold text-gray-400 mt-1">Rechnungsnummer: # {invoice.id}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-8 mb-10">
+              <div className="bg-indigo-50/15 border border-indigo-50 rounded-xl p-4">
+                <p className="text-[8px] font-black text-indigo-400 uppercase tracking-widest mb-1.5">Empfängerdaten</p>
+                <p className="text-xs font-bold text-gray-900">{invoice.customerName}</p>
+                <p className="text-[10px] text-gray-500 mt-1">{invoice.email}</p>
+              </div>
+              <div className="flex flex-col justify-center space-y-1.5 text-right pr-2">
+                <div className="flex justify-end gap-4 text-[10px]">
+                   <span className="font-bold text-gray-400 uppercase tracking-wider">Erstellt:</span>
+                   <span className="font-bold text-gray-900">{invoice.date}</span>
+                </div>
+                <div className="flex justify-end gap-4 text-[10px]">
+                   <span className="font-bold text-gray-400 uppercase tracking-wider">Fälligkeit:</span>
+                   <span className="font-bold text-indigo-600">{invoice.dueDate}</span>
+                </div>
+              </div>
+            </div>
+
+            {invoice.introText && (
+              <p className="mb-6 text-gray-600 whitespace-pre-line leading-relaxed border-l-2 border-indigo-100 pl-4">{invoice.introText}</p>
+            )}
+
+            <table className="w-full text-left mb-10">
+              <thead>
+                <tr className="bg-indigo-50/40 text-indigo-900 border-b border-indigo-100">
+                  <th className="py-2.5 px-3 text-[9px] font-black uppercase tracking-widest rounded-l-lg">Position / Beschreibung</th>
+                  <th className="py-2.5 px-3 text-[9px] font-black uppercase tracking-widest text-right rounded-r-lg">Betrag (Netto)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoice.positions?.map((pos) => (
+                  <tr key={pos.id} className="border-b border-gray-100/70 hover:bg-gray-50/30">
+                    <td className="py-4 px-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-bold text-gray-900">{pos.name}</p>
+                        {pos.category && (
+                          <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-600 text-[7px] font-black uppercase tracking-wider rounded">{pos.category}</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-400 mt-0.5 whitespace-pre-line leading-relaxed">{pos.description}</p>
+                    </td>
+                    <td className="py-4 px-3 text-right text-xs font-bold text-gray-900">{formatCurrency(getPositionNetSubtotal(pos))}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            <div className="flex justify-end mb-10">
+              <div className="w-56 space-y-2 bg-indigo-50/10 border border-indigo-50/20 p-3 rounded-xl">
+                <div className="flex justify-between text-[10px] font-medium text-gray-500">
+                   <span>Nettobetrag</span>
+                   <span>{formatCurrency(invoice.amountNet || 0)}</span>
+                </div>
+                <div className="flex justify-between text-[10px] font-medium text-gray-500">
+                   <span>USt. ({invoiceSettings.defaultVatRate === 19 ? 20 : (invoiceSettings.defaultVatRate || 20)}%)</span>
+                   <span>{formatCurrency(invoice.amountVat || 0)}</span>
+                </div>
+                <div className="h-px bg-indigo-100/50 my-1.5" />
+                <div className="flex justify-between text-sm font-black text-indigo-900">
+                   <span>Rechnungsbetrag</span>
+                   <span>{formatCurrency(invoice.amountGross || 0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-8 sm:p-12 pt-0">
+            {invoice.footerText && (
+              <p className="text-[9px] text-gray-400 italic mb-8 border-t border-gray-100 pt-3">{invoice.footerText}</p>
+            )}
+
+            <div className="border-t border-indigo-50 pt-6 text-[8px] text-gray-400 grid grid-cols-3 gap-6">
+              <div>
+                <p className="font-bold text-indigo-900 uppercase tracking-widest mb-1">Zahlungsdetails</p>
+                <p>IBAN: {invoiceSettings.bankIban}</p>
+                <p>BIC: {invoiceSettings.bankBic}</p>
+                <p>Bank: {invoiceSettings.bankName}</p>
+              </div>
+              <div>
+                <p className="font-bold text-indigo-900 uppercase tracking-widest mb-1">Unternehmensinfo</p>
+                <p>Steuer-Nr: {invoiceSettings.companyTaxId}</p>
+                <p>UID-Nr: {invoiceSettings.companyVatId}</p>
+              </div>
+              <div>
+                <p className="font-bold text-indigo-900 uppercase tracking-widest mb-1">Bedingungen</p>
+                <p>{invoice.paymentTerms}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Creative Elegant (Charcoal Left Sidebar + White Right Column)
+    if (selectedTemplate === "creative") {
+      return (
+        <div className="bg-white text-left text-gray-800 text-[11px] leading-relaxed shadow-sm min-h-[297mm] flex print:block">
+          {/* Dark Sidebar Panel */}
+          <div className="w-[32%] bg-slate-900 text-white p-6 sm:p-8 flex flex-col justify-between shrink-0 print:hidden">
+            <div>
+              <div className="h-10 w-10 bg-white text-slate-950 font-black rounded-xl mb-12 flex items-center justify-center text-sm shadow-lg">TM</div>
+              
+              <h1 className="text-xl font-black tracking-tight text-white mb-1.5 uppercase leading-none">{docTitle}</h1>
+              <p className="text-[9px] font-bold text-slate-400 mb-8">Nr. {invoice.id}</p>
+
+              <div className="space-y-4 text-[9px]">
+                <div>
+                  <p className="font-black text-slate-500 uppercase tracking-widest mb-0.5">Ausstellungsdatum</p>
+                  <p className="font-bold text-white">{invoice.date}</p>
+                </div>
+                <div>
+                  <p className="font-black text-slate-500 uppercase tracking-widest mb-0.5">Zahlungsfrist</p>
+                  <p className="font-bold text-white">{invoice.dueDate}</p>
+                </div>
+                <div className="pt-4 border-t border-slate-800 mt-4">
+                  <p className="font-black text-slate-500 uppercase tracking-widest mb-1">Rechnungsempfänger</p>
+                  <p className="text-xs font-black text-white">{invoice.customerName}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5 leading-snug">{invoice.email}</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="text-[8px] text-slate-500 space-y-1.5 leading-relaxed">
+              <p className="font-black text-slate-400 uppercase tracking-widest">Support & Kontakt</p>
+              <p>Mail: {invoiceSettings.companyEmail || "billing@trada.space"}</p>
+              <p>Web: trada.space</p>
+            </div>
+          </div>
+
+          {/* White Main Column */}
+          <div className="flex-1 p-8 sm:p-10 flex flex-col justify-between min-h-full">
+            <div>
+              <div className="flex justify-between items-start mb-12">
+                <div>
+                  <p className="font-bold text-slate-900 text-xs">{invoiceSettings.companyName}</p>
+                  <p className="text-[9px] text-slate-400 mt-1 whitespace-pre-line leading-relaxed">{invoiceSettings.companyAddress}</p>
+                </div>
+                <div className="text-right hidden print:block">
+                  <h1 className="text-xl font-black text-slate-900 leading-none">{docTitle}</h1>
+                  <p className="text-[8px] text-slate-400 mt-1">Nr. {invoice.id}</p>
+                  <p className="text-[8px] text-slate-400 mt-0.5">Datum: {invoice.date}</p>
+                </div>
+              </div>
+
+              {invoice.introText && (
+                <p className="mb-8 text-slate-600 whitespace-pre-line leading-relaxed">{invoice.introText}</p>
+              )}
+
+              <table className="w-full text-left mb-8">
+                <thead>
+                  <tr className="border-b border-slate-900">
+                    <th className="py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest">Dienstleistung / Beschreibung</th>
+                    <th className="py-2 text-[9px] font-black text-slate-400 uppercase tracking-widest text-right">Summe</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {invoice.positions?.map((pos) => (
+                    <tr key={pos.id} className="border-b border-slate-100">
+                      <td className="py-4">
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-bold text-slate-900">{pos.name}</p>
+                          {pos.category && (
+                            <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 text-[7px] font-black uppercase tracking-wider rounded">{pos.category}</span>
+                          )}
+                        </div>
+                        <p className="text-[9px] text-slate-400 mt-0.5 whitespace-pre-line leading-relaxed">{pos.description}</p>
+                      </td>
+                      <td className="py-4 text-right text-xs font-bold text-slate-900">{formatCurrency(getPositionNetSubtotal(pos))}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              <div className="flex justify-end mb-8">
+                <div className="w-48 space-y-2">
+                  <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                     <span>Netto</span>
+                     <span>{formatCurrency(invoice.amountNet || 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-[10px] text-slate-500 font-medium">
+                     <span>MwSt. ({invoiceSettings.defaultVatRate === 19 ? 20 : (invoiceSettings.defaultVatRate || 20)}%)</span>
+                     <span>{formatCurrency(invoice.amountVat || 0)}</span>
+                  </div>
+                  <div className="h-px bg-slate-900 my-2" />
+                  <div className="flex justify-between text-xs font-black text-slate-950">
+                     <span>Gesamtsumme</span>
+                     <span>{formatCurrency(invoice.amountGross || 0)}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              {invoice.footerText && (
+                <p className="text-[9px] text-slate-400 italic mb-6 border-t border-slate-50 pt-3">{invoice.footerText}</p>
+              )}
+
+              <div className="border-t border-slate-100 pt-6 text-[8px] text-slate-400 grid grid-cols-2 gap-6">
+                <div>
+                  <p className="font-bold text-slate-900 uppercase tracking-widest mb-1">Zahlung an</p>
+                  <p>Inhaber: {invoiceSettings.bankOwner}</p>
+                  <p>IBAN: {invoiceSettings.bankIban}</p>
+                  <p>BIC: {invoiceSettings.bankBic}</p>
+                  <p>Bank: {invoiceSettings.bankName}</p>
+                </div>
+                <div>
+                  <p className="font-bold text-slate-900 uppercase tracking-widest mb-1">Steuerdaten</p>
+                  <p>USt-IdNr: {invoiceSettings.companyVatId}</p>
+                  <p>Steuer-Nr: {invoiceSettings.companyTaxId}</p>
+                  <p>Konditionen: {invoice.paymentTerms}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return null;
+  };
+
   return (
     <div className="space-y-6 pb-12">
       {/* Top Toolbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-xl border border-gray-100 shadow-sm sticky top-0 z-40">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.back()} className="h-8 w-8 flex items-center justify-center bg-gray-50 rounded-lg hover:bg-gray-100 transition-all">
+          <button onClick={handleBack} className="h-8 w-8 flex items-center justify-center bg-gray-50 rounded-lg hover:bg-gray-100 transition-all border border-gray-100/50">
             <ArrowLeft className="h-4 w-4 text-gray-500" />
           </button>
           <div>
@@ -272,22 +763,28 @@ export default function InvoiceEditorPage() {
             <div className="flex items-center gap-1.5 mt-0.5">
                <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{invoice.type}</p>
                <span className="h-1 w-1 bg-gray-200 rounded-full" />
-               <span className={`text-[8px] font-bold uppercase tracking-widest ${invoice.status === 'BEZAHLT' ? 'text-emerald-500' : 'text-orange-500'}`}>{invoice.status}</span>
+               <span className={`text-[8px] font-bold uppercase tracking-widest ${invoice.status?.startsWith('BEZAHLT') ? 'text-emerald-500' : 'text-orange-500'}`}>{invoice.status}</span>
+               {isDirty && (
+                 <>
+                   <span className="h-1 w-1 bg-gray-200 rounded-full" />
+                   <span className="text-[8px] font-bold text-amber-500 bg-amber-50 px-1.5 rounded border border-amber-100">Ungespeicherte Änderungen</span>
+                 </>
+               )}
             </div>
           </div>
         </div>
         <div className="flex items-center gap-2">
           <button 
             onClick={() => setIsPreviewOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-100 transition-all"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 rounded-lg text-xs font-bold hover:bg-gray-100 transition-all border border-gray-100/50"
           >
-            <Eye className="h-3.5 w-3.5" /> Vorschau
+            <Eye className="h-3.5 w-3.5" /> Vollbild
           </button>
           <button 
             onClick={handleSave}
             className="flex items-center gap-1.5 px-4 py-2 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition-all shadow-md"
           >
-            <Save className="h-3.5 w-3.5" /> {isNew ? "Speichern" : "Aktualisieren"}
+            <Save className="h-3.5 w-3.5" /> {isNew ? "Entwurf Speichern" : "Aktualisieren"}
           </button>
         </div>
       </div>
@@ -304,9 +801,11 @@ export default function InvoiceEditorPage() {
       </div>
 
       {activeTab === "data" ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-in fade-in duration-200">
-          {/* Left Side: Main Editor */}
-          <div className="lg:col-span-2 space-y-6">
+        /* Real-time Side-by-Side Live Split Screen Layout */
+        <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 animate-in fade-in duration-200">
+          
+          {/* Left Column: Form Editor Panel */}
+          <div className="xl:col-span-7 space-y-6">
             
             {/* Section: Items Table */}
             <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -315,6 +814,12 @@ export default function InvoiceEditorPage() {
                   <Package className="h-4 w-4 text-gray-400" /> Positionen
                 </h2>
                 <div className="flex flex-wrap items-center gap-1.5">
+                   <button 
+                     onClick={() => setIsSavedPositionsModalOpen(true)} 
+                     className="flex items-center gap-1 px-2 py-1 bg-amber-50 text-amber-600 border border-amber-200/50 text-[8px] font-bold rounded hover:bg-amber-100 transition-all uppercase tracking-wider"
+                   >
+                     <Star className="h-2.5 w-2.5" /> Hizmet Şablonları
+                   </button>
                    <button onClick={() => setIsProductModalOpen(true)} className="flex items-center gap-1 px-2 py-1 bg-gray-900 text-white text-[8px] font-bold rounded hover:bg-gray-800 transition-all uppercase tracking-wider">
                       <Search className="h-2.5 w-2.5" /> Produkt-Datenbank
                    </button>
@@ -334,7 +839,7 @@ export default function InvoiceEditorPage() {
                               <div
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
-                                className={`p-2 rounded-xl border border-transparent hover:border-gray-100 hover:bg-gray-50/30 transition-all group flex items-start gap-2.5 ${pos.type !== 'item' ? 'bg-gray-50/15' : ''}`}
+                                className={`p-2.5 rounded-xl border border-transparent hover:border-gray-100 hover:bg-gray-50/30 transition-all group flex items-start gap-2.5 ${pos.type !== 'item' ? 'bg-gray-50/15' : ''}`}
                               >
                                 <div {...provided.dragHandleProps} className="mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab">
                                   <GripVertical className="h-3.5 w-3.5 text-gray-300" />
@@ -343,49 +848,39 @@ export default function InvoiceEditorPage() {
                                 <div className="flex-1 grid grid-cols-12 gap-3">
                                   {pos.type === 'item' ? (
                                     <>
-                                      <div className="col-span-12 md:col-span-6 space-y-0.5">
+                                      <div className="col-span-12 md:col-span-7 space-y-1">
                                         <input 
                                           type="text" 
-                                          placeholder="Produkt/Dienstleistung" 
+                                          placeholder="Leistungsname / Servicebezeichnung" 
                                           className="w-full bg-transparent font-bold text-xs outline-none border-b border-transparent focus:border-black/5 pb-0.5"
                                           value={pos.name}
                                           onChange={(e) => updatePosition(pos.id, { name: e.target.value })}
                                         />
+                                        
+                                        {/* Spacious description textarea */}
                                         <textarea 
-                                          placeholder="Beschreibung (optional)" 
-                                          className="w-full bg-transparent text-[10px] text-gray-400 outline-none resize-none font-medium leading-relaxed"
-                                          rows={1}
+                                          placeholder="Ausführliche Beschreibung der erbrachten Leistung (optional)..." 
+                                          className="w-full bg-gray-50/35 border border-gray-100/50 rounded-lg p-2 text-[10px] text-gray-505 outline-none resize-y min-h-[70px] font-medium leading-relaxed"
+                                          rows={4}
                                           value={pos.description}
                                           onChange={(e) => updatePosition(pos.id, { description: e.target.value })}
                                         />
-                                        <div className="flex items-center gap-1 mt-1 bg-gray-50/50 px-2 py-0.5 rounded-lg w-max border border-gray-100/50">
-                                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Leistung:</span>
+                                        
+                                        <div className="flex items-center gap-1.5 mt-1 bg-gray-50/50 px-2 py-0.5 rounded-lg w-max border border-gray-100/50">
+                                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Kategorie:</span>
                                           <select 
                                             className="bg-transparent text-[9px] font-bold text-gray-600 outline-none cursor-pointer hover:text-black appearance-none"
                                             value={pos.category || ""}
                                             onChange={(e) => updatePosition(pos.id, { category: e.target.value })}
                                           >
-                                            <option value="">Keine Leistungskategorie</option>
+                                            <option value="">Keine Kategorie</option>
                                             {LEISTUNGS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
                                           </select>
                                         </div>
                                       </div>
-                                      <div className="col-span-3 md:col-span-1">
-                                        <input 
-                                          type="number" 
-                                          className="w-full bg-transparent text-xs text-center outline-none border-b border-transparent focus:border-black/5 pb-0.5 font-bold"
-                                          value={pos.quantity}
-                                          onChange={(e) => updatePosition(pos.id, { quantity: parseFloat(e.target.value) || 0 })}
-                                        />
-                                        <select 
-                                          className="w-full bg-transparent text-[8px] text-gray-400 outline-none appearance-none text-center cursor-pointer font-bold"
-                                          value={pos.unit}
-                                          onChange={(e) => updatePosition(pos.id, { unit: e.target.value as any })}
-                                        >
-                                          {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                                        </select>
-                                      </div>
-                                      <div className="col-span-3 md:col-span-2">
+                                      
+                                      {/* Price Input Column with Netto/Brutto selection */}
+                                      <div className="col-span-6 md:col-span-3">
                                         <input 
                                           type="number" 
                                           className="w-full bg-transparent text-xs text-right outline-none border-b border-transparent focus:border-black/5 pb-0.5 font-bold"
@@ -401,7 +896,8 @@ export default function InvoiceEditorPage() {
                                             }
                                           }}
                                         />
-                                        <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                                        
+                                        <div className="flex items-center justify-end gap-1.5 mt-1">
                                           <button
                                             type="button"
                                             onClick={() => {
@@ -445,7 +941,9 @@ export default function InvoiceEditorPage() {
                                           </select>
                                         </div>
                                       </div>
-                                      <div className="col-span-3 md:col-span-1">
+
+                                      {/* Rabatt input with type selection */}
+                                      <div className="col-span-3 md:col-span-1 border-r border-transparent">
                                         <div className="flex items-center gap-0.5 border-b border-transparent focus-within:border-black/5 justify-end">
                                           <input 
                                             type="number" 
@@ -478,7 +976,9 @@ export default function InvoiceEditorPage() {
                                         </div>
                                         <p className="text-[7px] text-gray-300 text-right mt-0.5 font-bold">RABATT</p>
                                       </div>
-                                      <div className="col-span-3 md:col-span-2 text-right pt-0.5">
+
+                                      {/* Subtotal Display */}
+                                      <div className="col-span-3 md:col-span-1 text-right pt-0.5 pr-1">
                                         <p className="text-xs font-bold text-gray-900">
                                           {formatCurrency(getPositionNetSubtotal(pos))}
                                         </p>
@@ -497,9 +997,20 @@ export default function InvoiceEditorPage() {
                                   )}
                                 </div>
 
-                                <button onClick={() => removePosition(pos.id)} className="mt-0.5 p-1 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                <div className="flex flex-col gap-1 items-center shrink-0">
+                                  <button onClick={() => removePosition(pos.id)} className="p-1 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all">
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                  {pos.type === 'item' && (
+                                    <button 
+                                      onClick={() => handleSaveToLibrary(pos)} 
+                                      className="p-1 text-gray-200 hover:text-amber-500 opacity-0 group-hover:opacity-100 transition-all"
+                                      title="In Hizmet Şablonları Kütüphanesine Kaydet"
+                                    >
+                                      <Star className="h-3.5 w-3.5" />
+                                    </button>
+                                  )}
+                                </div>
                               </div>
                             )}
                           </Draggable>
@@ -553,65 +1064,73 @@ export default function InvoiceEditorPage() {
                   />
                </div>
             </section>
-          </div>
 
-          {/* Right Side: Settings & Totals */}
-          <div className="space-y-6">
-            
-            {/* Totals Summary Card */}
-            <section className="bg-neutral-900 text-white rounded-2xl p-4 shadow-xl relative overflow-hidden">
-               <h3 className="text-[9px] font-bold text-white/50 uppercase tracking-widest mb-3">Berechnung</h3>
-               <div className="space-y-2.5 relative z-10">
-                  <div className="flex justify-between text-xs font-medium">
-                     <span className="text-white/50">Netto Gesamt</span>
-                     <span className="font-bold">{formatCurrency(invoice.amountNet || 0)}</span>
-                  </div>
-                  <div className="flex justify-between text-xs font-medium">
-                     <span className="text-white/50">MwSt. ({invoiceSettings.defaultVatRate}%)</span>
-                     <span className="font-bold">{formatCurrency(invoice.amountVat || 0)}</span>
-                  </div>
-                  <div className="h-px bg-white/10 my-2" />
-                  <div className="flex justify-between items-center">
-                     <span className="text-xs font-bold text-white/70">Brutto Gesamt</span>
-                     <span className="text-lg font-black tracking-tight">{formatCurrency(invoice.amountGross || 0)}</span>
-                  </div>
-               </div>
-               <div className="absolute -right-4 -bottom-4 h-20 w-20 bg-white/5 rounded-full blur-2xl" />
-            </section>
-
-            {/* Customer Selection */}
-            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-               <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Empfänger (Kunde)</h3>
-               <div className="space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-300" />
-                    <select 
-                      className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs appearance-none outline-none focus:ring-1 focus:ring-black/5 font-bold"
-                      value={invoice.customerId}
-                      onChange={(e) => {
-                        const c = customers.find(cust => cust.id === e.target.value);
-                        if (c) setInvoice({ ...invoice, customerId: c.id, customerName: c.name, email: c.email });
-                      }}
+            {/* Customer & Basics details (compacted in mobile view on left) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Customer selection */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                 <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Empfänger (Kunde)</h3>
+                 <div className="space-y-3">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-gray-300" />
+                      <select 
+                        className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs appearance-none outline-none focus:ring-1 focus:ring-black/5 font-bold"
+                        value={invoice.customerId}
+                        onChange={(e) => {
+                          const c = customers.find(cust => cust.id === e.target.value);
+                          if (c) setInvoice({ ...invoice, customerId: c.id, customerName: c.name, email: c.email });
+                        }}
+                      >
+                        <option value="">Kunde auswählen...</option>
+                        {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <button 
+                      onClick={() => setIsCustomerModalOpen(true)}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-gray-200 rounded-xl text-[9px] font-bold text-gray-400 hover:border-black hover:text-black transition-all uppercase tracking-widest"
                     >
-                      <option value="">Kunde auswählen...</option>
-                      {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      <UserPlus className="h-3.5 w-3.5" /> Neuen Kunden anlegen
+                    </button>
+                 </div>
+              </div>
+
+              {/* Invoice settings selection */}
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+                <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Rechnungs-Eigenschaften</h3>
+                <div className="grid grid-cols-1 gap-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Vorlage wählen</span>
+                    <select
+                      className="px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none font-bold text-gray-800"
+                      value={selectedTemplate}
+                      onChange={(e) => setSelectedTemplate(e.target.value as any)}
+                    >
+                      <option value="modern">Modern Minimalist</option>
+                      <option value="classic">Corporate Classic</option>
+                      <option value="creative">Creative Elegant</option>
                     </select>
                   </div>
-                  <button 
-                    onClick={() => setIsCustomerModalOpen(true)}
-                    className="w-full flex items-center justify-center gap-1.5 py-2 border border-dashed border-gray-200 rounded-xl text-[9px] font-bold text-gray-400 hover:border-black hover:text-black transition-all uppercase tracking-widest"
-                  >
-                    <UserPlus className="h-3.5 w-3.5" /> Neuen Kunden anlegen
-                  </button>
-               </div>
-            </section>
+                  
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Dokumententyp</span>
+                    <select
+                      className="px-2 py-1 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none font-bold text-gray-800"
+                      value={invoice.type}
+                      onChange={(e) => setInvoice({...invoice, type: e.target.value as any})}
+                    >
+                      {INVOICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
 
-            {/* Invoice Basics */}
+            {/* Invoice Details Basics */}
             <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-               <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsdetails</h3>
-               <div className="grid grid-cols-1 gap-4">
+               <h3 className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Dokumentdetails</h3>
+               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <div className="space-y-1.5">
-                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsnummer</label>
+                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Dokumentennummer</label>
                      <input 
                       type="text" 
                       className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none"
@@ -620,81 +1139,41 @@ export default function InvoiceEditorPage() {
                      />
                   </div>
                   <div className="space-y-1.5">
-                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungstyp</label>
-                     <select 
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs outline-none appearance-none font-bold"
-                      value={invoice.type}
-                      onChange={(e) => setInvoice({...invoice, type: e.target.value as any})}
-                     >
-                       {INVOICE_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-                     </select>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsdatum</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none"
+                      value={invoice.date}
+                      onChange={(e) => setInvoice({...invoice, date: e.target.value})}
+                    />
                   </div>
                   <div className="space-y-1.5">
-                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Kategorie</label>
-                     <select 
-                      className="w-full px-3 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs outline-none appearance-none font-bold"
-                      value={invoice.category || ""}
-                      onChange={(e) => setInvoice({...invoice, category: e.target.value})}
-                     >
-                       <option value="">Keine Kategorie</option>
-                       {LEISTUNGS_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                     </select>
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Rechnungsdatum</label>
-                      <input 
-                        type="date" 
-                        className="w-full px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none"
-                        value={invoice.date}
-                        onChange={(e) => setInvoice({...invoice, date: e.target.value})}
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Fälligkeit</label>
-                      <input 
-                        type="date" 
-                        className="w-full px-2 py-1.5 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-bold outline-none"
-                        value={invoice.dueDate}
-                        onChange={(e) => setInvoice({...invoice, dueDate: e.target.value})}
-                      />
-                    </div>
+                    <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Fälligkeit</label>
+                    <input 
+                      type="date" 
+                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold outline-none"
+                      value={invoice.dueDate}
+                      onChange={(e) => setInvoice({...invoice, dueDate: e.target.value})}
+                    />
                   </div>
                </div>
             </section>
+          </div>
 
-            {/* Internationalization */}
-            <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4">
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                       <Globe className="h-3 w-3 text-gray-300" /> Sprache
-                     </label>
-                     <select 
-                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none font-bold"
-                      value={invoice.language}
-                      onChange={(e) => setInvoice({...invoice, language: e.target.value as any})}
-                     >
-                       {LANGUAGES.map(l => <option key={l} value={l}>{l}</option>)}
-                     </select>
-                  </div>
-                  <div className="space-y-1.5">
-                     <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1">
-                       <Euro className="h-3 w-3 text-gray-300" /> Währung
-                     </label>
-                     <select 
-                      className="w-full px-2.5 py-1.5 bg-gray-50 border border-gray-100 rounded-lg text-xs outline-none font-bold"
-                      value={invoice.currency}
-                      onChange={(e) => setInvoice({...invoice, currency: e.target.value})}
-                     >
-                       <option value="EUR">EUR (€)</option>
-                       <option value="USD">USD ($)</option>
-                       <option value="GBP">GBP (£)</option>
-                       <option value="TRY">TRY (₺)</option>
-                     </select>
-                  </div>
-               </div>
-            </section>
+          {/* Right Column: Live PDF Document Preview Panel (Sticky on Desktop) */}
+          <div className="xl:col-span-5 hidden xl:block sticky top-20 h-[calc(100vh-120px)] overflow-y-auto bg-gray-50 border border-gray-100/80 rounded-2xl p-4 shadow-inner">
+            <div className="flex items-center justify-between mb-3 px-2">
+              <h3 className="text-[9px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                <Eye className="h-3.5 w-3.5 text-gray-400" />
+                Live PDF-Dokument Vorschau
+              </h3>
+              <span className="px-2 py-0.5 bg-white border border-gray-100 text-gray-400 text-[8px] font-bold rounded uppercase shadow-sm">Real-time</span>
+            </div>
+            
+            {/* Elegant preview viewport container */}
+            <div className="border border-gray-100/50 rounded-xl overflow-hidden shadow-md scale-[0.98] origin-top bg-white">
+              <InvoicePdfContent />
+            </div>
           </div>
         </div>
       ) : activeTab === "payments" ? (
@@ -750,7 +1229,7 @@ export default function InvoiceEditorPage() {
               addCustomer(newC);
               setInvoice({ ...invoice, customerId: newC.id, customerName: newC.name, email: newC.email });
               setIsCustomerModalOpen(false);
-              toast.success("Customer added and selected");
+              toast.success("Kunde erfolgreich angelegt");
             }} className="p-4 sm:p-5 space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Firmenname *</label>
@@ -766,118 +1245,114 @@ export default function InvoiceEditorPage() {
         </div>
       )}
 
+      {/* Product selection search modal */}
+      {isProductModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="p-4 sm:p-5 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-gray-900">Produkt-Datenbank</h2>
+              <button onClick={() => setIsProductModalOpen(false)} className="text-gray-400 hover:text-black transition-colors"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-4 sm:p-5 space-y-3">
+              {products.map(p => (
+                <div 
+                  key={p.id} 
+                  onClick={() => handleAddProduct(p)}
+                  className="p-3 bg-gray-50 rounded-xl border border-gray-100 hover:border-black cursor-pointer transition-all flex justify-between items-center"
+                >
+                  <div>
+                    <h4 className="text-xs font-bold text-gray-900">{p.name}</h4>
+                    <p className="text-[9px] text-gray-400 mt-0.5">{p.description}</p>
+                  </div>
+                  <span className="text-xs font-bold text-gray-900">{formatCurrency(p.defaultPrice)}</span>
+                </div>
+              ))}
+              {products.length === 0 && <p className="text-center text-[10px] text-gray-300 italic">Keine Produkte vorhanden.</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Saved Positions Library modal */}
+      {isSavedPositionsModalOpen && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh] animate-in zoom-in-95 duration-200 border border-gray-100">
+            <div className="p-4 sm:p-5 border-b border-gray-50 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1.5">
+                <Star className="h-4 w-4 text-amber-500" />
+                Hizmet Şablonları Kütüphanesi
+              </h2>
+              <button onClick={() => setIsSavedPositionsModalOpen(false)} className="text-gray-400 hover:text-black transition-colors"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-4 sm:p-5 space-y-3">
+              <p className="text-[10px] text-gray-400 leading-relaxed font-medium mb-3">
+                Zuvor gespeicherte Dienstleistungen und standardisierte Festpreise. Klicken Sie auf eine Vorlage, um sie in den Editor einzufügen.
+              </p>
+              
+              <div className="space-y-2">
+                {savedPositions.map(sp => (
+                  <div 
+                    key={sp.id}
+                    className="p-3 bg-gray-50 hover:bg-gray-100/50 rounded-xl border border-gray-100 hover:border-amber-200 transition-all flex items-start justify-between gap-4 group cursor-pointer"
+                    onClick={() => handleAddSavedPosition(sp)}
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-gray-900">{sp.name}</h4>
+                        {sp.category && (
+                          <span className="px-1.5 py-0.2 bg-amber-50 text-amber-700 text-[7px] font-black uppercase tracking-wider rounded">{sp.category}</span>
+                        )}
+                      </div>
+                      <p className="text-[9px] text-gray-400 mt-1 whitespace-pre-line leading-relaxed">{sp.description}</p>
+                    </div>
+                    <div className="text-right shrink-0 flex items-center gap-2">
+                      <div>
+                        <span className="text-xs font-bold text-gray-900">{formatCurrency(sp.priceNet)}</span>
+                        <p className="text-[7px] font-black text-gray-400 uppercase tracking-widest mt-0.5">USt. {sp.vatRate}%</p>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          deleteSavedPosition(sp.id);
+                          toast.info("Vorlage gelöscht");
+                        }}
+                        className="p-1.5 text-gray-200 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all rounded hover:bg-gray-200/50"
+                        title="Vorlage löschen"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+                {savedPositions.length === 0 && (
+                  <p className="text-center text-[10px] text-gray-300 italic py-8">Keine gespeicherten Dienstleistungen vorhanden.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Full Screen Preview Modal */}
       {isPreviewOpen && (
-        <div className="fixed inset-0 bg-gray-900 z-[100] flex flex-col">
-          <div className="h-16 bg-white border-b border-gray-200 px-8 flex items-center justify-between">
+        <div className="fixed inset-0 bg-gray-900/95 backdrop-blur-md z-[100] flex flex-col animate-in fade-in duration-200">
+          <div className="h-16 bg-white border-b border-gray-200 px-6 sm:px-8 flex items-center justify-between shadow-sm">
              <div className="flex items-center gap-4">
-                <h2 className="text-sm font-bold text-gray-900">Live PDF-Vorschau</h2>
-                <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-bold rounded uppercase">Draft</span>
+                <h2 className="text-sm font-bold text-gray-900">Vollbild PDF-Vorschau</h2>
+                <span className="px-2 py-1 bg-neutral-900 text-white text-[8px] font-black rounded uppercase tracking-wider">Entwurf</span>
              </div>
-             <div className="flex items-center gap-4">
-                <button onClick={() => window.print()} className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-black transition-all">
-                  <Printer className="h-4 w-4" /> Drucken
+             <div className="flex items-center gap-3">
+                <button onClick={() => window.print()} className="flex items-center gap-1.5 px-3 py-1.5 bg-black text-white rounded-lg text-xs font-bold hover:bg-gray-800 transition-all shadow-md">
+                  <Printer className="h-4 w-4" /> Drucken / Export
                 </button>
-                <button onClick={() => setIsPreviewOpen(false)} className="h-10 w-10 flex items-center justify-center bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-gray-500">
-                  <X className="h-6 w-6" />
+                <button onClick={() => setIsPreviewOpen(false)} className="h-10 w-10 flex items-center justify-center bg-gray-50 rounded-xl hover:bg-gray-100 transition-all text-gray-500 border border-gray-100/50">
+                  <X className="h-5 w-5" />
                 </button>
              </div>
           </div>
-          <div className="flex-1 overflow-y-auto bg-gray-100 p-12">
-             <div id="invoice-pdf" className="max-w-[210mm] min-h-[297mm] mx-auto bg-white shadow-2xl p-16 print:shadow-none print:p-0">
-                {/* PDF Content Placeholder */}
-                <div className="flex justify-between items-start mb-20">
-                   <div>
-                      <div className="h-16 w-16 bg-black rounded-2xl mb-8 flex items-center justify-center text-white font-bold text-xl">TM</div>
-                      <p className="text-xs font-bold text-gray-900">{invoiceSettings.companyName}</p>
-                      <p className="text-[10px] text-gray-500 mt-1 whitespace-pre-line">{invoiceSettings.companyAddress}</p>
-                   </div>
-                   <div className="text-right">
-                      <h1 className="text-4xl font-bold tracking-tight mb-2">RECHNUNG</h1>
-                      <p className="text-xs font-bold text-gray-400"># {invoice.id}</p>
-                   </div>
-                </div>
-
-                <div className="flex justify-between mb-20">
-                   <div className="max-w-[300px]">
-                      <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-2 border-b border-gray-100 pb-1">Rechnungsempfänger</p>
-                      <p className="text-sm font-bold text-gray-900">{invoice.customerName}</p>
-                      <p className="text-xs text-gray-500 mt-1">{invoice.email}</p>
-                   </div>
-                   <div className="flex gap-12">
-                      <div className="text-right">
-                         <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-1">Date</p>
-                         <p className="text-xs font-bold text-gray-900">{invoice.date}</p>
-                      </div>
-                      <div className="text-right">
-                         <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mb-1">Due Date</p>
-                         <p className="text-xs font-bold text-gray-900">{invoice.dueDate}</p>
-                      </div>
-                   </div>
-                </div>
-
-                <table className="w-full text-left mb-12">
-                   <thead>
-                      <tr className="border-b border-gray-100">
-                         <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Position</th>
-                         <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Menge</th>
-                         <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Einzelpreis</th>
-                         <th className="py-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Gesamt</th>
-                      </tr>
-                   </thead>
-                   <tbody>
-                      {invoice.positions?.map((pos) => (
-                         <tr key={pos.id} className="border-b border-gray-50">
-                            <td className="py-6">
-                               <p className="text-sm font-bold text-gray-900">{pos.name}</p>
-                               <p className="text-[10px] text-gray-400 mt-1">{pos.description}</p>
-                            </td>
-                            <td className="py-6 text-center text-xs font-medium text-gray-600">{pos.quantity}</td>
-                            <td className="py-6 text-right text-xs font-medium text-gray-600">{formatCurrency(pos.priceNet)}</td>
-                            <td className="py-6 text-right text-sm font-bold text-gray-900">{formatCurrency(getPositionNetSubtotal(pos))}</td>
-                         </tr>
-                      ))}
-                   </tbody>
-                </table>
-
-                <div className="flex justify-end">
-                   <div className="w-64 space-y-3">
-                      <div className="flex justify-between text-xs font-medium text-gray-500">
-                         <span>Zwischensumme (Netto)</span>
-                         <span>{formatCurrency(invoice.amountNet || 0)}</span>
-                      </div>
-                      <div className="flex justify-between text-xs font-medium text-gray-500">
-                         <span>VAT ({invoiceSettings.defaultVatRate}%)</span>
-                         <span>{formatCurrency(invoice.amountVat || 0)}</span>
-                      </div>
-                      <div className="h-px bg-gray-100 my-4" />
-                      <div className="flex justify-between text-lg font-bold text-gray-900">
-                         <span>Total</span>
-                         <span>{formatCurrency(invoice.amountGross || 0)}</span>
-                      </div>
-                   </div>
-                </div>
-
-                <div className="mt-40 border-t border-gray-100 pt-12 text-[10px] text-gray-400 grid grid-cols-3 gap-12">
-                   <div>
-                      <p className="font-bold text-gray-900 uppercase tracking-widest mb-2">Zahlungsdetails</p>
-                      <p>Bank: {invoiceSettings.bankName}</p>
-                      <p>IBAN: {invoiceSettings.bankIban}</p>
-                      <p>BIC: {invoiceSettings.bankBic}</p>
-                   </div>
-                   <div>
-                      <p className="font-bold text-gray-900 uppercase tracking-widest mb-2">Unternehmensinfo</p>
-                      <p>Tax ID: {invoiceSettings.companyTaxId}</p>
-                      <p>VAT ID: {invoiceSettings.companyVatId}</p>
-                   </div>
-                   <div>
-                      <p className="font-bold text-gray-900 uppercase tracking-widest mb-2">Bedingungen</p>
-                      <p>{invoice.paymentTerms}</p>
-                   </div>
-                </div>
-                <div className="mt-20 text-center text-[9px] text-gray-300">
-                   {invoiceSettings.defaultFooter}
-                </div>
+          <div className="flex-1 overflow-y-auto bg-gray-900/50 p-6 sm:p-12">
+             <div className="max-w-[210mm] mx-auto shadow-2xl rounded-2xl overflow-hidden bg-white">
+                <InvoicePdfContent />
              </div>
           </div>
         </div>

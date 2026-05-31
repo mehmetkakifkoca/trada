@@ -46,7 +46,6 @@ export function Sidebar() {
       children: [
         { label: "Rechnungen", href: "/accounting/invoices" },
         { label: "Ausgaben", href: "/accounting/expenses" },
-        { label: "Angebote", href: "/accounting/offers" },
       ]
     },
     { label: "Kunden", href: "/crm", icon: Users, roles: ["CEO", "Co Founder", "Manager", "Mitarbeiter"], permission: "crm" },

@@ -90,7 +90,7 @@ export default function AccountingPage() {
       </div>
 
       {/* Navigation Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {[
           { 
             title: "Rechnungen", 
@@ -107,14 +107,6 @@ export default function AccountingPage() {
             icon: Wallet,
             color: "bg-pink-50 text-pink-600",
             stats: `${expenses.length} Belege`
-          },
-          { 
-            title: "Angebote", 
-            desc: "Erstellen Sie Angebote und verfolgen Sie die Pipeline.", 
-            href: "/accounting/offers", 
-            icon: FileSearch,
-            color: "bg-indigo-50 text-indigo-600",
-            stats: "Pipeline aktiv"
           },
         ].map((item, i) => (
           <Link 

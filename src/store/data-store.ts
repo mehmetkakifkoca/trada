@@ -133,6 +133,7 @@ export interface Invoice {
   skontoDays?: number;
   paymentMethod: "Bank transfer" | "Cash" | "Card" | "PayPal" | "Stripe" | "Other";
   history?: Array<{ date: string; action: string; user: string }>;
+  pdfTemplate?: "modern" | "classic" | "creative";
 }
 
 export interface Product {
@@ -143,6 +144,17 @@ export interface Product {
   unit: InvoicePosition["unit"];
   vatRate: number;
   category: SystemCategory;
+}
+
+export interface SavedPosition {
+  id: string;
+  name: string;
+  description: string;
+  priceNet: number;
+  vatRate: number;
+  category?: string;
+  priceType?: "NET" | "GROSS";
+  priceGross?: number;
 }
 
 export interface RecurringInvoice {
@@ -493,6 +505,8 @@ interface DataState {
   freelancerTags: FreelancerTag[];
   freelancerWorkLogs: FreelancerWorkLog[];
   
+  savedPositions: SavedPosition[];
+  
   // Actions
   setCustomers: (customers: Customer[]) => void;
   addCustomer: (customer: Customer) => void;
@@ -592,6 +606,9 @@ interface DataState {
   addFreelancerWorkLog: (log: FreelancerWorkLog) => void;
   updateFreelancerWorkLog: (id: string, log: Partial<FreelancerWorkLog>) => void;
   deleteFreelancerWorkLog: (id: string) => void;
+  
+  addSavedPosition: (pos: SavedPosition) => void;
+  deleteSavedPosition: (id: string) => void;
 }
 
 
@@ -770,6 +787,11 @@ export const useDataStore = create<DataState>()(
       unassignedWorkTimes: [],
       freelancerTags: [],
       freelancerWorkLogs: [],
+      savedPositions: [
+        { id: "sp-template-1", name: "Grafik-Design Dienstleistung", description: "Erstellung von Corporate Identity, Logos und Drucksorten.", priceNet: 150, vatRate: 20, category: "Grafik/Druck", priceType: "NET", priceGross: 180 },
+        { id: "sp-template-2", name: "Web Design & SEO Optimierung", description: "Design einer modernen Landingpage und Suchmaschinenoptimierung.", priceNet: 1200, vatRate: 20, category: "Web Design/SEO", priceType: "NET", priceGross: 1440 },
+        { id: "sp-template-3", name: "Online Marketing Kampagne", description: "Konzeption und Schaltung von Werbeanzeigen auf Google Ads & Meta.", priceNet: 850, vatRate: 20, category: "Online Marketing", priceType: "NET", priceGross: 1020 },
+      ],
 
       setCustomers: (customers) => set({ customers }),
       addCustomer: (customer) => set((state) => ({ customers: [...state.customers, customer] })),
@@ -972,6 +994,14 @@ export const useDataStore = create<DataState>()(
       })),
       deleteFreelancerWorkLog: (id) => set((state) => ({
         freelancerWorkLogs: state.freelancerWorkLogs.filter((l) => l.id !== id)
+      })),
+      
+      addSavedPosition: (pos) => set((state) => {
+        if (state.savedPositions.some(p => p.name === pos.name)) return {};
+        return { savedPositions: [...state.savedPositions, pos] };
+      }),
+      deleteSavedPosition: (id) => set((state) => ({
+        savedPositions: state.savedPositions.filter(p => p.id !== id)
       })),
 
     }),
